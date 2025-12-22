@@ -1,0 +1,175 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// กำหนดเครื่องมือ (Prisma Client)
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Enums derived from dropdowns and badges in HTML
+enum Role {
+  STUDENT // นักศึกษา
+  TEACHER // อาจารย์
+  STAFF // เจ้าหน้าที่
+  ADMIN // ผู้บริหาร/Admin
+}
+
+enum UserStatus {
+  ACTIVE // เปิดใช้งาน
+  INACTIVE // ปิดใช้งาน
+}
+
+enum LocationType {
+  HOSPITAL_CENTER // โรงพยาบาลศูนย์
+  HOSPITAL_GENERAL // โรงพยาบาลทั่วไป
+  HOSPITAL_COMMUNITY // โรงพยาบาลชุมชน
+  HEALTH_CENTER // สถานีอนามัย
+  OTHER // อื่นๆ
+}
+
+enum LocationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SupervisionType {
+  ONSITE // นิเทศตัวต่อตัว
+  ONLINE // นิเทศออนไลน์
+  PHONE // นิเทศทางโทรศัพท์
+}
+
+enum SupervisionStatus {
+  PENDING // รอดำเนินการ
+  COMPLETED // เสร็จสิ้น
+  CANCELLED // ยกเลิก
+}
+
+enum SupervisionResult {
+  EXCELLENT // ดีเยี่ยม
+  GOOD // ดี
+  FAIR // พอใช้
+  IMPROVE // ต้องปรับปรุง
+}
+
+// From user.html and student.html
+model User {
+  id        Int        @id @default(autoincrement())
+  username  String     @unique // e.g. std63001, tch001
+  password  String
+  email     String     @unique // e.g. std63001@sci.psru.ac.th
+  prefix    String? // e.g. นาย, นางสาว, ผศ.ดร.
+  firstName String // e.g. สมชาย
+  lastName  String // e.g. ใจดี
+  role      Role       @default(STUDENT)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Student specific fields
+  studentId    String? @unique // e.g. 630101
+  major        String? // e.g. สาธารณสุขศาสตร์
+  academicYear Int? // e.g. 66 (from group generation or derived)
+
+  // Relationships
+  // A student belongs to one training group (optional until selected)
+  trainingGroupId Int?
+  trainingGroup   TrainingGroup? @relation("GroupStudents", fields: [trainingGroupId], references: [id])
+
+  // A teacher can advise multiple groups
+  advisedGroups TrainingGroup[] @relation("GroupAdvisors")
+
+  // Supervision relationships
+  supervisionsReceived Supervision[] @relation("Supervisee")
+  supervisionsGiven    Supervision[] @relation("Supervisor")
+
+  @@map("users")
+}
+
+// From location.html
+model Location {
+  id        Int            @id @default(autoincrement())
+  name      String // e.g. โรงพยาบาลศูนย์พิบูลสงคราม
+  address   String? // e.g. ถ.วิสุทธิ์กษัตริย์ ต.ในเมือง
+  province  String // e.g. พิษณุโลก
+  type      LocationType   @default(HOSPITAL_GENERAL)
+  status    LocationStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  // Relationships
+  groups TrainingGroup[]
+
+  @@map("locations")
+}
+
+// From group.html and student.html (Group Selection)
+model TrainingGroup {
+  id          Int      @id @default(autoincrement())
+  name        String // e.g. กลุ่มฝึกงานที่ 1
+  generation  String // e.g. 66 (รุ่นนักศึกษา)
+  startDate   DateTime // e.g. 2023-06-01
+  endDate     DateTime // e.g. 2023-08-31
+  description String?
+  isActive    Boolean  @default(true)
+  capacity    Int      @default(5) // From student.html "3/5"
+
+  // Relationships
+  locationId Int
+  location   Location @relation(fields: [locationId], references: [id])
+
+  students User[] @relation("GroupStudents")
+  advisors User[] @relation("GroupAdvisors")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("training_groups")
+}
+
+// From follow.html
+model Supervision {
+  id           Int             @id @default(autoincrement())
+  date         DateTime // วันที่นิเทศ
+  type         SupervisionType // รูปแบบ
+  locationName String? // สถานที่นัดหมาย
+  note         String? // หมายเหตุ/เตรียมเอกสาร
+
+  // Results (filled after completion)
+  result     SupervisionResult?
+  comment    String? // ความคิดเห็น/ข้อเสนอแนะ
+  attachment String? // File path/url
+
+  status SupervisionStatus @default(PENDING)
+
+  // Relationships
+  studentId Int
+  student   User @relation("Supervisee", fields: [studentId], references: [id])
+
+  supervisorId Int
+  supervisor   User @relation("Supervisor", fields: [supervisorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("supervisions")
+}
+
+// System Settings
+model SystemConfig {
+  key         String   @id
+  value       String
+  description String?
+  group       String? // e.g., 'GENERAL', 'ACADEMIC'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_configs")
+}
