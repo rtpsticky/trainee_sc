@@ -1,89 +1,41 @@
-'use server';
+'use server'
 
-import prisma from '../lib/prisma';
-import { revalidatePath } from 'next/cache';
+import prisma from '../lib/prisma'
+import { revalidatePath } from 'next/cache'
+import { authorize, MANAGE_ROLES } from '../lib/auth'
+import { DEFAULT_SETTINGS } from '../lib/settings'
 
-const DEFAULT_SETTINGS = [
-    { key: 'SYSTEM_NAME', value: 'ระบบติดตามการฝึกงาน', description: 'ชื่อระบบที่แสดงส่วนหัว', group: 'GENERAL' },
-    { key: 'ACADEMIC_YEAR', value: '2566', description: 'ปีการศึกษาปัจจุบัน', group: 'ACADEMIC' },
-    { key: 'SEMESTER', value: '1', description: 'ภาคการศึกษาปัจจุบัน', group: 'ACADEMIC' },
-    { key: 'CONTACT_EMAIL', value: 'science@psru.ac.th', description: 'อีเมลติดต่อผู้ดูแลระบบ', group: 'CONTACT' },
-];
-
-export async function getSettings() {
-    try {
-        const settings = await prisma.systemConfig.findMany({
-            orderBy: { key: 'asc' }
-        });
-
-        // Convert array to object for easier consumption { KEY: VALUE }
-        // Also keep full list for editing UI
-        const settingsMap = settings.reduce((acc, curr) => {
-            acc[curr.key] = curr.value;
-            return acc;
-        }, {});
-
-        // If specific keys are missing, we might want to return defaults or seed them
-        // Check if database is empty or missing keys
-        if (settings.length === 0) {
-            await seedSettings();
-            return await getSettings(); // Recursively call once to get fresh data
-        }
-
-        return { settings, settingsMap };
-    } catch (error) {
-        console.error('Failed to fetch settings:', error);
-        return { error: 'Failed to fetch settings' };
-    }
+const validators = {
+    SYSTEM_NAME: (v) => (v ? null : 'กรุณาระบุชื่อระบบ'),
+    ACADEMIC_YEAR: (v) => (/^\d{4}$/.test(v) ? null : 'ปีการศึกษาต้องเป็นตัวเลข 4 หลัก (พ.ศ.) เช่น 2569'),
+    SEMESTER: (v) => (['1', '2', '3'].includes(v) ? null : 'ภาคการศึกษาต้องเป็น 1, 2 หรือ 3'),
+    CONTACT_EMAIL: (v) => (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : 'รูปแบบอีเมลติดต่อไม่ถูกต้อง'),
 }
 
-export async function updateSetting(formData) {
-    try {
-        // Handle multiple updates if needed, or single
-        // Assuming the form sends key-value pairs
-        // For simplicity, let's look for known keys in formData
+export async function updateSettings(prevState, formData) {
+    const auth = await authorize(MANAGE_ROLES)
+    if (auth.error) return { error: auth.error }
 
-        const updates = [];
-
-        // Iterate through all entries to find valid keys
-        for (const [key, value] of formData.entries()) {
-            // We can check if this key exists in our known defaults or DB, or just upsert everything
-            // Ideally we shouldn't allow arbitrary keys via public action without check
-
-            // Simple check: is it one of our known keys?
-            const knownKeys = DEFAULT_SETTINGS.map(s => s.key);
-            if (knownKeys.includes(key)) {
-                updates.push(prisma.systemConfig.upsert({
-                    where: { key: key },
-                    update: { value: value.toString() },
-                    create: { key: key, value: value.toString(), group: 'GENERAL' } // Fallback group
-                }));
-            }
-        }
-
-        await Promise.all(updates);
-
-        revalidatePath('/settings');
-        revalidatePath('/'); // Update layouts that might use these settings
-        return { success: true };
-    } catch (error) {
-        console.error('Failed to update settings:', error);
-        return { error: 'Failed to update settings: ' + error.message };
+    const values = Object.fromEntries(DEFAULT_SETTINGS.filter(d => formData.has(d.key)).map(d => [d.key, String(formData.get(d.key))]))
+    const updates = []
+    for (const setting of DEFAULT_SETTINGS) {
+        if (!formData.has(setting.key)) continue
+        const value = values[setting.key].trim()
+        const problem = validators[setting.key]?.(value)
+        if (problem) return { error: problem, values }
+        updates.push(prisma.systemConfig.upsert({
+            where: { key: setting.key },
+            update: { value },
+            create: { ...setting, value },
+        }))
     }
-}
 
-export async function seedSettings() {
     try {
-        for (const setting of DEFAULT_SETTINGS) {
-            await prisma.systemConfig.upsert({
-                where: { key: setting.key },
-                update: {}, // Don't overwrite if exists
-                create: setting
-            });
-        }
-        return { success: true };
+        await prisma.$transaction(updates)
+        revalidatePath('/', 'layout')
+        return { success: true, savedAt: Date.now(), values }
     } catch (error) {
-        console.error('Failed to seed settings:', error);
-        return { error: 'Failed to seed settings' };
+        console.error('Failed to update settings:', error)
+        return { error: 'เกิดข้อผิดพลาดในการบันทึกการตั้งค่า', values }
     }
 }

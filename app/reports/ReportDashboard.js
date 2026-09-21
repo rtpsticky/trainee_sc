@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+
 
 export default function ReportDashboard({ data }) {
     if (!data || data.error) {
-        return <div className="p-4 text-red-500">Error loading report data.</div>;
+        return <div className="p-4 text-red-500">ไม่สามารถโหลดข้อมูลรายงานได้ กรุณาลองใหม่อีกครั้ง</div>;
     }
 
     const { counts, supervision, locationStats } = data;
@@ -32,7 +32,7 @@ export default function ReportDashboard({ data }) {
     };
 
     return (
-        <div className="p-6">
+        <div>
             <div className="flex justify-end mb-6 print:hidden">
                 <button
                     onClick={handlePrint}

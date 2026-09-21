@@ -9,7 +9,7 @@ const sarabun = Sarabun({
 });
 
 export const metadata = {
-  title: "หน้าหลัก - ระบบฝึกงาน สาธารณสุขศาสตร์ มรพส.",
+  title: "ระบบฝึกงาน สาธารณสุขศาสตร์ มรพส.",
   description: "ระบบฝึกงาน สาธารณสุขศาสตร์ มหาวิทยาลัยราชภัฏพิบูลสงคราม",
 };
 
@@ -20,7 +20,7 @@ export default function RootLayout({ children }) {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
       </head>
       <body
-        className={`${sarabun.variable} antialiased font-sans bg-[#f3f4f6]`}
+        className={`${sarabun.variable} antialiased font-sans`}
       >
         {children}
       </body>

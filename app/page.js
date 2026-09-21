@@ -1,53 +1,36 @@
-import { getSession } from './lib/session';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
-import { getDashboardQuickStats, getRecentActivities, getUpcomingSupervisions } from './actions/dashboard';
+import AppShell from './components/AppShell';
+import { getCurrentUser } from './lib/auth';
+import { redirect } from 'next/navigation';
+import { getDashboardStats } from './lib/reports';
+import { getRecentActivities, getUpcomingSupervisions, getStudentGroup } from './lib/dashboard';
+import { getSettingsMap } from './lib/settings';
+import { SUPERVISION_TYPE_LABELS, formatDate, formatDay, formatTime, formatTimeAgo } from './lib/format';
+
+export const metadata = { title: 'หน้าหลัก' };
 
 export default async function Dashboard() {
-  const session = await getSession();
+  const user = await getCurrentUser();
+  if (!user) redirect('/login');
 
-  // If not logged in, show simple landing or redirect
-  // For consistency with other pages which use Sidebar, let's Redirect to login if user is not authenticated
-  // Or if we want a public landing page, we'd need a different layout. 
-  // Based on current request "Home page use data...", it implies an internal dashboard.
-  if (!session) {
-    redirect('/login');
+  const settings = await getSettingsMap();
+  const semesterLabel = `ภาคการศึกษา ${settings.SEMESTER}/${settings.ACADEMIC_YEAR}`;
+
+  if (user.role === 'STUDENT') {
+    return <StudentHome user={user} semesterLabel={semesterLabel} />;
   }
 
-  const user = session;
-
-  // Fetch Data
-  const statsData = await getDashboardQuickStats();
-  const activities = await getRecentActivities();
-  const upcomingSupervisions = await getUpcomingSupervisions();
+  const canManage = ['STAFF', 'ADMIN'].includes(user.role);
+  const [statsData, activities, upcomingSupervisions] = await Promise.all([
+    getDashboardStats(),
+    canManage ? getRecentActivities() : [],
+    getUpcomingSupervisions(),
+  ]);
 
   const { counts, supervision } = statsData.error ? { counts: {}, supervision: {} } : statsData;
 
-  // Formatting helpers
-  const formatTimeAgo = (date) => {
-    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + " ปีที่แล้ว";
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + " เดือนที่แล้ว";
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + " วันที่แล้ว";
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + " ชั่วโมงที่แล้ว";
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + " นาทีที่แล้ว";
-    return "เมื่อสักครู่";
-  };
-
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
-      <Sidebar user={user} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header user={user} title="หน้าหลัก" icon="fa-home" />
-
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+    <AppShell user={user} title="หน้าหลัก" icon="fa-home">
           {/* Welcome Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -61,7 +44,7 @@ export default async function Dashboard() {
               </div>
               <div className="mt-4 md:mt-0">
                 <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full border border-blue-100">
-                  ภาคการศึกษา 1/2566
+                  {semesterLabel}
                 </span>
               </div>
             </div>
@@ -74,21 +57,21 @@ export default async function Dashboard() {
               value={counts?.students || 0}
               icon="fa-user-graduate"
               color="blue"
-              link="/users?tab=STUDENT"
+              link={canManage ? '/users?tab=STUDENT' : null}
             />
             <StatCard
               title="สถานที่ฝึกงาน"
               value={counts?.locations || 0}
               icon="fa-hospital"
               color="purple"
-              link="/locations"
+              link={canManage ? '/locations' : null}
             />
             <StatCard
               title="กลุ่มฝึกงาน"
               value={counts?.groups || 0}
               icon="fa-users"
               color="green"
-              link="/groups"
+              link={canManage ? '/groups' : null}
             />
             <StatCard
               title="รอการนิเทศ"
@@ -109,15 +92,15 @@ export default async function Dashboard() {
                   <i className="fas fa-bolt mr-2 text-yellow-500"></i> ทางลัดการทำงาน
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <QuickAction title="เพิ่มนักศึกษา" icon="fa-user-plus" color="blue" href="/users" />
-                  <QuickAction title="เพิ่มแหล่งฝึก" icon="fa-building" color="purple" href="/locations" />
+                  {canManage && <QuickAction title="เพิ่มนักศึกษา" icon="fa-user-plus" color="blue" href="/users?tab=STUDENT&new=1" />}
+                  {canManage && <QuickAction title="จัดกลุ่มฝึกงาน" icon="fa-users" color="purple" href="/groups" />}
                   <QuickAction title="นัดหมายนิเทศ" icon="fa-calendar-plus" color="green" href="/supervisions" />
                   <QuickAction title="ดูรายงาน" icon="fa-file-alt" color="indigo" href="/reports" />
                 </div>
               </div>
 
               {/* Recent Activities */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              {canManage && <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-50 flex justify-between items-center">
                   <h3 className="text-lg font-bold text-gray-800 flex items-center">
                     <i className="fas fa-history mr-2 text-gray-400"></i> กิจกรรมล่าสุด
@@ -141,7 +124,7 @@ export default async function Dashboard() {
                     <div className="p-8 text-center text-gray-400 text-sm">ยังไม่มีกิจกรรมล่าสุด</div>
                   )}
                 </div>
-              </div>
+              </div>}
 
             </div>
 
@@ -159,12 +142,12 @@ export default async function Dashboard() {
                     <div key={sup.id} className="p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex items-start mb-2">
                         <div className="flex-col flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg p-2 min-w-[50px] mr-3">
-                          <span className="text-xl font-bold leading-none">{new Date(sup.date).getDate()}</span>
-                          <span className="text-[10px] uppercase font-bold">{new Date(sup.date).toLocaleDateString('th-TH', { month: 'short' })}</span>
+                          <span className="text-xl font-bold leading-none">{new Date(sup.date).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric' })}</span>
+                          <span className="text-[10px] uppercase font-bold">{new Date(sup.date).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', month: 'short' })}</span>
                         </div>
                         <div>
                           <p className="text-sm font-bold text-gray-800 line-clamp-1">{sup.student.firstName} {sup.student.lastName}</p>
-                          <p className="text-xs text-gray-500">{new Date(sup.date).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น. • {sup.type}</p>
+                          <p className="text-xs text-gray-500">{formatTime(sup.date)} • {SUPERVISION_TYPE_LABELS[sup.type]}</p>
                         </div>
                       </div>
                       <div className="ml-[62px]">
@@ -185,13 +168,70 @@ export default async function Dashboard() {
             </div>
           </div>
 
-        </main>
-      </div>
-    </div>
+    </AppShell>
   );
 }
 
 // Components
+function Wrapper({ href, className, children }) {
+  return href ? <Link href={href} className={className}>{children}</Link> : <div className={className}>{children}</div>;
+}
+
+async function StudentHome({ user, semesterLabel }) {
+  const [group, upcoming] = await Promise.all([
+    getStudentGroup(user.trainingGroupId),
+    getUpcomingSupervisions(user.id),
+  ]);
+
+  return (
+    <AppShell user={user} title="หน้าหลัก" icon="fa-home">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-xl font-bold text-gray-800">สวัสดี, {user.firstName} {user.lastName} 👋</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {semesterLabel}{user.studentId ? ` · รหัสนักศึกษา ${user.studentId}` : ''}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4"><i className="fas fa-users mr-2 text-green-600"></i>กลุ่มฝึกงานของฉัน</h3>
+          {group ? (
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div><dt className="text-gray-500">กลุ่ม</dt><dd className="font-medium text-gray-900">{group.name} (รุ่น {group.generation})</dd></div>
+              <div><dt className="text-gray-500">สถานที่ฝึกงาน</dt><dd className="font-medium text-gray-900">{group.location.name}</dd></div>
+              <div><dt className="text-gray-500">ระยะเวลา</dt><dd className="font-medium text-gray-900">{formatDay(group.startDate)} - {formatDay(group.endDate)}</dd></div>
+              <div>
+                <dt className="text-gray-500">อาจารย์ที่ปรึกษา</dt>
+                <dd className="font-medium text-gray-900">
+                  {group.advisors.length > 0 ? group.advisors.map(a => `${a.prefix ?? ''}${a.firstName} ${a.lastName}`).join(', ') : 'ยังไม่ระบุ'}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="text-sm text-gray-500">คุณยังไม่ได้ถูกจัดเข้ากลุ่มฝึกงาน กรุณาติดต่อเจ้าหน้าที่</p>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4"><i className="fas fa-calendar-alt mr-2 text-blue-500"></i>การนิเทศที่กำลังจะมาถึง</h3>
+          {upcoming.length > 0 ? (
+            <ul className="divide-y divide-gray-100">
+              {upcoming.map(sup => (
+                <li key={sup.id} className="py-3 text-sm">
+                  <p className="font-medium text-gray-900">{formatDate(sup.date)} {formatTime(sup.date)}</p>
+                  <p className="text-gray-500">{SUPERVISION_TYPE_LABELS[sup.type]} · {sup.locationName || 'ไม่ระบุสถานที่'} · ผู้นิเทศ {sup.supervisor.firstName} {sup.supervisor.lastName}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-500">ยังไม่มีการนัดหมายนิเทศ</p>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}
+
 function StatCard({ title, value, icon, color, link }) {
   const colors = {
     blue: 'bg-blue-50 text-blue-600',
@@ -201,7 +241,7 @@ function StatCard({ title, value, icon, color, link }) {
   };
 
   return (
-    <Link href={link || '#'} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center hover:shadow-md transition-shadow cursor-pointer">
+    <Wrapper href={link} className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center ${link ? 'hover:shadow-md transition-shadow cursor-pointer' : ''}`}>
       <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${colors[color]}`}>
         <i className={`fas ${icon} text-xl`}></i>
       </div>
@@ -209,7 +249,7 @@ function StatCard({ title, value, icon, color, link }) {
         <p className="text-sm font-medium text-gray-500">{title}</p>
         <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
       </div>
-    </Link>
+    </Wrapper>
   );
 }
 

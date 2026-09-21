@@ -1,107 +1,122 @@
-'use server';
+'use server'
 
-import prisma from '../lib/prisma';
-import { revalidatePath } from 'next/cache';
+import prisma from '../lib/prisma'
+import { revalidatePath } from 'next/cache'
+import { authorize, SUPERVISE_ROLES } from '../lib/auth'
+
+const TYPES = ['ONSITE', 'ONLINE', 'PHONE']
+const STATUSES = ['PENDING', 'COMPLETED', 'CANCELLED']
+const RESULTS = ['EXCELLENT', 'GOOD', 'FAIR', 'IMPROVE']
+
+const text = (formData, key) => String(formData.get(key) ?? '').trim()
+
+// Form values are Thai local time; the +07:00 keeps the stored instant correct
+// no matter which timezone the server runs in.
+function parseDateTime(date, time) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
+    const value = new Date(`${date}T${time}:00+07:00`)
+    return isNaN(value.getTime()) ? null : value
+}
 
 export async function createSupervision(formData) {
+    const auth = await authorize(SUPERVISE_ROLES)
+    if (auth.error) return { error: auth.error }
+
+    const studentId = parseInt(text(formData, 'studentId'), 10)
+    const type = text(formData, 'type')
+    const date = parseDateTime(text(formData, 'date'), text(formData, 'time'))
+
+    if (isNaN(studentId)) return { error: 'กรุณาเลือกนักศึกษา' }
+    if (!date) return { error: 'กรุณาระบุวันที่และเวลานิเทศให้ถูกต้อง' }
+    if (!TYPES.includes(type)) return { error: 'รูปแบบการนิเทศไม่ถูกต้อง' }
+
     try {
-        const studentId = parseInt(formData.get('studentId'));
-        const supervisorId = parseInt(formData.get('supervisorId')); // In real app, this comes from session
-
-        // Date and Time handling
-        // Expected format from form: date="YYYY-MM-DD" or "DD/MM/YYYY", time="HH:mm"
-        // We will combine them into a JS Date object
-        const dateStr = formData.get('date');
-        const timeStr = formData.get('time');
-
-        // Parse date - assuming DD/MM/YYYY from flatpickr or YYYY-MM-DD
-        let dateObj;
-        if (dateStr.includes('/')) {
-            const [day, month, year] = dateStr.split('/');
-            dateObj = new Date(`${year}-${month}-${day}T${timeStr}:00`);
-        } else {
-            dateObj = new Date(`${dateStr}T${timeStr}:00`);
-        }
-
-        const type = formData.get('type'); // ONSITE, ONLINE, PHONE
-        const locationName = formData.get('locationName');
-        const note = formData.get('note');
+        const student = await prisma.user.findFirst({ where: { id: studentId, role: 'STUDENT' }, select: { id: true } })
+        if (!student) return { error: 'ไม่พบนักศึกษาที่เลือก' }
 
         await prisma.supervision.create({
             data: {
-                student: { connect: { id: studentId } },
-                supervisor: { connect: { id: supervisorId } }, // Needs a valid teacher/admin ID
-                date: dateObj,
-                type: type,
-                locationName: locationName,
-                note: note,
-                status: 'PENDING'
-            }
-        });
+                studentId,
+                // Always the signed-in user, never a value sent from the browser.
+                supervisorId: auth.user.id,
+                date,
+                type,
+                locationName: text(formData, 'locationName') || null,
+                note: text(formData, 'note') || null,
+                status: 'PENDING',
+            },
+        })
 
-        revalidatePath('/supervisions');
-        return { success: true };
+        revalidatePath('/', 'layout')
+        return { success: true }
     } catch (error) {
-        console.error('Failed to create supervision:', error);
-        return { error: 'Failed to create supervision: ' + error.message };
+        console.error('Failed to create supervision:', error)
+        return { error: 'เกิดข้อผิดพลาดในการบันทึกการนิเทศ' }
     }
 }
 
 export async function updateSupervision(formData) {
+    const auth = await authorize(SUPERVISE_ROLES)
+    if (auth.error) return { error: auth.error }
+
+    const id = parseInt(text(formData, 'id'), 10)
+    const status = text(formData, 'status')
+    const type = text(formData, 'type')
+    const dateText = text(formData, 'date')
+    const timeText = text(formData, 'time')
+
+    if (isNaN(id)) return { error: 'ไม่พบข้อมูลการนิเทศ' }
+    if (!STATUSES.includes(status)) return { error: 'สถานะไม่ถูกต้อง' }
+
+    const data = {
+        status,
+        locationName: text(formData, 'locationName') || null,
+        note: text(formData, 'note') || null,
+    }
+
+    if (dateText || timeText) {
+        const date = parseDateTime(dateText, timeText)
+        if (!date) return { error: 'กรุณาระบุวันที่และเวลานิเทศให้ถูกต้อง' }
+        data.date = date
+    }
+    if (type) {
+        if (!TYPES.includes(type)) return { error: 'รูปแบบการนิเทศไม่ถูกต้อง' }
+        data.type = type
+    }
+
+    if (status === 'COMPLETED') {
+        const result = text(formData, 'result')
+        if (!RESULTS.includes(result)) return { error: 'กรุณาเลือกผลการประเมินก่อนบันทึกสถานะ "เสร็จสิ้น"' }
+        data.result = result
+        data.comment = text(formData, 'comment') || null
+    } else {
+        // Results only make sense on a completed supervision.
+        data.result = null
+        data.comment = text(formData, 'comment') || null
+    }
+
     try {
-        const id = parseInt(formData.get('id'));
-        const status = formData.get('status'); // PENDING, COMPLETED, CANCELLED
-
-        const updateData = {
-            status: status
-        };
-
-        // If completing the supervision, update result fields
-        if (status === 'COMPLETED') {
-            updateData.result = formData.get('result'); // EXCELLENT, GOOD, FAIR, IMPROVE
-            updateData.comment = formData.get('comment');
-            // updateData.attachment = formData.get('attachment'); // Handle file upload separately/later
-        } else {
-            // If just updating info (e.g. rescheduling)
-            const dateStr = formData.get('date');
-            const timeStr = formData.get('time');
-            if (dateStr && timeStr) {
-                let dateObj;
-                if (dateStr.includes('/')) {
-                    const [day, month, year] = dateStr.split('/');
-                    dateObj = new Date(`${year}-${month}-${day}T${timeStr}:00`);
-                } else {
-                    dateObj = new Date(`${dateStr}T${timeStr}:00`);
-                }
-                updateData.date = dateObj;
-            }
-            if (formData.get('type')) updateData.type = formData.get('type');
-            if (formData.get('locationName')) updateData.locationName = formData.get('locationName');
-            if (formData.get('note')) updateData.note = formData.get('note');
-        }
-
-        await prisma.supervision.update({
-            where: { id },
-            data: updateData
-        });
-
-        revalidatePath('/supervisions');
-        return { success: true };
+        await prisma.supervision.update({ where: { id }, data })
+        revalidatePath('/', 'layout')
+        return { success: true }
     } catch (error) {
-        console.error('Failed to update supervision:', error);
-        return { error: 'Failed to update supervision: ' + error.message };
+        console.error('Failed to update supervision:', error)
+        if (error.code === 'P2025') return { error: 'ไม่พบข้อมูลการนิเทศนี้ อาจถูกลบไปแล้ว' }
+        return { error: 'เกิดข้อผิดพลาดในการบันทึกการนิเทศ' }
     }
 }
 
 export async function deleteSupervision(id) {
+    const auth = await authorize(SUPERVISE_ROLES)
+    if (auth.error) return { error: auth.error }
+
     try {
-        await prisma.supervision.delete({
-            where: { id: parseInt(id) }
-        });
-        revalidatePath('/supervisions');
-        return { success: true };
+        await prisma.supervision.delete({ where: { id: parseInt(id, 10) } })
+        revalidatePath('/', 'layout')
+        return { success: true }
     } catch (error) {
-        console.error('Failed to delete supervision:', error);
-        return { error: 'Failed to delete supervision: ' + error.message };
+        console.error('Failed to delete supervision:', error)
+        if (error.code === 'P2025') return { error: 'ไม่พบข้อมูลการนิเทศนี้ อาจถูกลบไปแล้ว' }
+        return { error: 'เกิดข้อผิดพลาดในการลบข้อมูลการนิเทศ' }
     }
 }

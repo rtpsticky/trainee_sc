@@ -1,6 +1,5 @@
-'use server';
-
-import prisma from '../lib/prisma';
+import 'server-only';
+import prisma from './prisma';
 
 export async function getDashboardStats() {
     try {
@@ -82,6 +81,6 @@ export async function getDashboardStats() {
 
     } catch (error) {
         console.error('Failed to get dashboard stats:', error);
-        return { error: 'Failed to fetch dashboard statistics' };
+        return { error: 'ไม่สามารถโหลดข้อมูลสถิติได้' };
     }
 }

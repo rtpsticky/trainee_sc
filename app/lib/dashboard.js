@@ -1,13 +1,9 @@
-'use server';
+import 'server-only';
+import prisma from './prisma';
+import { ROLE_LABELS } from './format';
 
-import prisma from '../lib/prisma';
-import { getDashboardStats } from './reports';
-
-export async function getDashboardQuickStats() {
-    return await getDashboardStats();
-}
-
-export async function getUpcomingSupervisions() {
+// `studentId` limits the list to one student's own appointments.
+export async function getUpcomingSupervisions(studentId) {
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -15,6 +11,7 @@ export async function getUpcomingSupervisions() {
         const supervisions = await prisma.supervision.findMany({
             where: {
                 status: 'PENDING',
+                ...(studentId ? { studentId } : {}),
                 date: {
                     gte: today
                 }
@@ -85,7 +82,7 @@ export async function getRecentActivities() {
             activities.push({
                 type: 'USER',
                 title: 'ผู้ใช้งานใหม่',
-                desc: `เพิ่มผู้ใช้งาน ${u.firstName} ${u.lastName} (${u.role})`,
+                desc: `เพิ่มผู้ใช้งาน ${u.firstName} ${u.lastName} (${ROLE_LABELS[u.role] ?? u.role})`,
                 date: u.createdAt,
                 icon: 'fa-user-plus',
                 color: 'bg-green-100 text-green-600'
@@ -110,5 +107,18 @@ export async function getRecentActivities() {
     } catch (error) {
         console.error('Failed to fetch recent activities:', error);
         return [];
+    }
+}
+
+export async function getStudentGroup(groupId) {
+    if (!groupId) return null;
+    try {
+        return await prisma.trainingGroup.findUnique({
+            where: { id: groupId },
+            include: { location: true, advisors: true }
+        });
+    } catch (error) {
+        console.error('Failed to fetch student group:', error);
+        return null;
     }
 }

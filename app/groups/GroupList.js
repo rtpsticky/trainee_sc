@@ -1,274 +1,148 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { createGroup, updateGroup, deleteGroup } from '../actions/groups';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+    createGroup, updateGroup, deleteGroup, addStudentsToGroup, removeStudentFromGroup,
+} from '../actions/groups';
+import Modal from '../components/Modal';
+import {
+    ConfirmDelete, ErrorAlert, FormActions, SearchBox, StatCard,
+    inputClass, labelClass, primaryButton, secondaryButton, useServerAction,
+} from '../components/ui';
+import { formatDay, toDayInputValue } from '../lib/format';
 
-export default function GroupList({ initialGroups = [], locations = [], teachers = [] }) {
-    const [groups, setGroups] = useState(initialGroups);
+const personName = (p) => `${p.prefix ?? ''}${p.firstName} ${p.lastName}`;
 
-    // Modal States
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [currentGroup, setCurrentGroup] = useState(null);
-    const [error, setError] = useState('');
+export default function GroupList({ groups, locations, teachers, students }) {
+    // modal: null | { type: 'add' } | { type: 'edit' | 'delete' | 'members', groupId }
+    const [modal, setModal] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('ALL');
+    const closeModal = () => setModal(null);
 
-    // Custom Advisor Selection State
-    const [selectedAdvisors, setSelectedAdvisors] = useState([]);
-    const [advisorSearch, setAdvisorSearch] = useState('');
-    const [isAdvisorDropdownOpen, setIsAdvisorDropdownOpen] = useState(false);
-    const advisorDropdownRef = useRef(null);
+    const filtered = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        return groups.filter(g => {
+            if (statusFilter === 'OPEN' && !g.isActive) return false;
+            if (statusFilter === 'CLOSED' && g.isActive) return false;
+            if (!term) return true;
+            return [g.name, g.generation, g.location.name].some(v => v.toLowerCase().includes(term));
+        });
+    }, [groups, searchTerm, statusFilter]);
 
-    // Initial Filtered Teachers (exclude already selected ones)
-    const filteredTeachers = teachers.filter(t =>
-        !selectedAdvisors.some(sa => sa.id === t.id) &&
-        (t.firstName.toLowerCase().includes(advisorSearch.toLowerCase()) ||
-            t.lastName.toLowerCase().includes(advisorSearch.toLowerCase()))
-    );
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        function handleClickOutside(event) {
-            if (advisorDropdownRef.current && !advisorDropdownRef.current.contains(event.target)) {
-                setIsAdvisorDropdownOpen(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, []);
-
-    // Handlers
-    const openAdd = () => {
-        setError('');
-        setCurrentGroup(null);
-        setSelectedAdvisors([]);
-        setAdvisorSearch('');
-        setIsAddModalOpen(true);
-    };
-
-    const openEdit = (group) => {
-        setError('');
-        setCurrentGroup(group);
-        // Pre-populate selected advisors
-        setSelectedAdvisors(group.advisors || []);
-        setAdvisorSearch('');
-        setIsEditModalOpen(true);
-    };
-
-    const openDelete = (group) => {
-        setCurrentGroup(group);
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleAddAdvisor = (teacher) => {
-        setSelectedAdvisors([...selectedAdvisors, teacher]);
-        setAdvisorSearch('');
-        // Keep focus or let user search again
-    };
-
-    const handleRemoveAdvisor = (teacherId) => {
-        setSelectedAdvisors(selectedAdvisors.filter(t => t.id !== teacherId));
-    };
-
-    // Actions
-    const handleCreate = async (formData) => {
-        // Validation for Advisors is optional but good UX
-        const result = await createGroup(formData);
-        if (result.error) {
-            setError(result.error);
-        } else {
-            setIsAddModalOpen(false);
-        }
-    };
-
-    const handleUpdate = async (formData) => {
-        if (!currentGroup) return;
-        const result = await updateGroup(currentGroup.id, formData);
-        if (result.error) {
-            setError(result.error);
-        } else {
-            setIsEditModalOpen(false);
-            setCurrentGroup(null);
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!currentGroup) return;
-        const result = await deleteGroup(currentGroup.id);
-        if (result.error) {
-            alert(result.error);
-        } else {
-            setIsDeleteModalOpen(false);
-            setCurrentGroup(null);
-        }
-    };
-
-    // Helper to format date
-    const formatDate = (dateString, type = 'display') => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        if (type === 'value') {
-            return date.toISOString().split('T')[0];
-        }
-        return date.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
-    };
+    const enrolledTotal = groups.reduce((sum, g) => sum + g._count.students, 0);
+    const unassignedTotal = students.filter(s => !s.trainingGroupId).length;
+    const modalGroup = modal?.groupId ? groups.find(g => g.id === modal.groupId) : null;
 
     return (
         <>
-            {/* Stats Cards - Modern Design */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow duration-200">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">กลุ่มฝึกงานทั้งหมด</p>
-                            <h3 className="text-3xl font-extrabold text-gray-800 mt-2">{groups.length}</h3>
-                        </div>
-                        <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
-                            <i className="fas fa-layer-group text-xl"></i>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow duration-200">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">นักศึกษาในระบบ</p>
-                            <h3 className="text-3xl font-extrabold text-gray-800 mt-2">{initialGroups.reduce((acc, g) => acc + (g._count?.students || 0), 0)}</h3>
-                        </div>
-                        <div className="p-3 bg-green-50 rounded-lg text-green-600">
-                            <i className="fas fa-user-graduate text-xl"></i>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow duration-200">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">อาจารย์ที่ปรึกษา</p>
-                            <h3 className="text-3xl font-extrabold text-gray-800 mt-2">{teachers.length}</h3>
-                        </div>
-                        <div className="p-3 bg-purple-50 rounded-lg text-purple-600">
-                            <i className="fas fa-chalkboard-teacher text-xl"></i>
-                        </div>
-                    </div>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <StatCard title="กลุ่มฝึกงานทั้งหมด" value={groups.length} icon="fa-layer-group" color="blue" />
+                <StatCard title="นักศึกษาที่จัดกลุ่มแล้ว" value={enrolledTotal} icon="fa-user-graduate" color="green" />
+                <StatCard title="นักศึกษาที่ยังไม่มีกลุ่ม" value={unassignedTotal} icon="fa-user-clock" color="yellow" />
             </div>
 
-            {/* List Section */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                {/* Custom Toolbar */}
-                <div className="px-6 py-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-50/50">
+                <div className="px-6 py-5 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-gray-50/50">
                     <div>
                         <h2 className="text-lg font-bold text-gray-800">รายการกลุ่มฝึกงาน</h2>
-                        <p className="text-sm text-gray-500">จัดการข้อมูลกลุ่มฝึกงานและการมอบหมายอาจารย์</p>
+                        <p className="text-sm text-gray-500">จัดการกลุ่ม อาจารย์ที่ปรึกษา และนักศึกษาในกลุ่ม</p>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="relative">
-                            <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                            <input
-                                type="text"
-                                placeholder="ค้นหาชื่อกลุ่ม..."
-                                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 text-sm w-full sm:w-64 transition-all"
-                            />
-                        </div>
-                        <button onClick={openAdd} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center text-sm font-medium">
+                        <SearchBox value={searchTerm} onChange={setSearchTerm} placeholder="ค้นหาชื่อกลุ่ม, รุ่น, สถานที่..." />
+                        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${inputClass} sm:w-40`}>
+                            <option value="ALL">ทุกสถานะ</option>
+                            <option value="OPEN">เปิดรับ</option>
+                            <option value="CLOSED">ปิดรับ</option>
+                        </select>
+                        <button onClick={() => setModal({ type: 'add' })} className={primaryButton}>
                             <i className="fas fa-plus mr-2"></i> สร้างกลุ่มใหม่
                         </button>
                     </div>
                 </div>
 
-                {/* Table */}
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50 uppercase tracking-wider text-xs font-semibold text-gray-500">
                             <tr>
-                                <th scope="col" className="px-6 py-4 text-left">กลุ่มฝึกงาน / รุ่น</th>
-                                <th scope="col" className="px-6 py-4 text-left">สถานที่และระยะเวลา</th>
-                                <th scope="col" className="px-6 py-4 text-left">อาจารย์ที่ปรึกษา</th>
-                                <th scope="col" className="px-6 py-4 text-left">ความคืบหน้า</th>
-                                <th scope="col" className="px-6 py-4 text-center">สถานะ</th>
-                                <th scope="col" className="px-6 py-4 text-right">ตัวเลือก</th>
+                                <th className="px-6 py-4 text-left">กลุ่มฝึกงาน / รุ่น</th>
+                                <th className="px-6 py-4 text-left">สถานที่และระยะเวลา</th>
+                                <th className="px-6 py-4 text-left">อาจารย์ที่ปรึกษา</th>
+                                <th className="px-6 py-4 text-left">นักศึกษา</th>
+                                <th className="px-6 py-4 text-center">สถานะ</th>
+                                <th className="px-6 py-4 text-right">ตัวเลือก</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-100">
-                            {initialGroups.map((group) => (
-                                <tr key={group.id} className="hover:bg-blue-50/30 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center">
-                                            <div className="flex-shrink-0 h-10 w-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
-                                                {group.name.charAt(0)}
+                            {filtered.map(group => {
+                                const count = group._count.students;
+                                const ratio = count / group.capacity;
+                                return (
+                                    <tr key={group.id} className="hover:bg-blue-50/30 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center">
+                                                <div className="flex-shrink-0 h-10 w-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
+                                                    {group.name.charAt(0)}
+                                                </div>
+                                                <div className="ml-4">
+                                                    <div className="text-sm font-bold text-gray-900">{group.name}</div>
+                                                    <div className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full inline-block mt-1">รุ่น {group.generation}</div>
+                                                </div>
                                             </div>
-                                            <div className="ml-4">
-                                                <div className="text-sm font-bold text-gray-900">{group.name}</div>
-                                                <div className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full inline-block mt-1">รุ่น {group.generation}</div>
+                                        </td>
+                                        <td className="px-6 py-4 max-w-xs">
+                                            <div className="text-sm text-gray-900 font-medium mb-1 truncate" title={group.location.name}>
+                                                <i className="fas fa-hospital text-gray-400 mr-2"></i>{group.location.name}
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 max-w-xs">
-                                        <div className="text-sm text-gray-900 font-medium mb-1 truncate" title={group.location.name}>
-                                            <i className="fas fa-hospital text-gray-400 mr-2"></i>{group.location.name}
-                                        </div>
-                                        <div className="flex items-center text-xs text-gray-500">
-                                            <span>{formatDate(group.startDate)}</span>
-                                            <span className="mx-2 text-gray-300">|</span>
-                                            <span>{formatDate(group.endDate)}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 max-w-xs">
-                                        <div className="flex flex-wrap gap-1">
-                                            {group.advisors && group.advisors.length > 0 ? (
-                                                group.advisors.map((advisor, idx) => (
-                                                    <span key={advisor.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                                                        {advisor.prefix}{advisor.firstName}
+                                            <div className="text-xs text-gray-500">{formatDay(group.startDate)} - {formatDay(group.endDate)}</div>
+                                        </td>
+                                        <td className="px-6 py-4 max-w-xs">
+                                            <div className="flex flex-wrap gap-1">
+                                                {group.advisors.length > 0 ? group.advisors.map(a => (
+                                                    <span key={a.id} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                                        {a.prefix}{a.firstName}
                                                     </span>
-                                                ))
-                                            ) : (
-                                                <span className="text-xs text-red-400 italic">ยังไม่ระบุ</span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap align-middle">
-                                        <div className="w-full max-w-[140px]">
-                                            <div className="flex justify-between text-xs mb-1">
-                                                <span className="font-medium text-gray-600">รับแล้ว {group._count?.students || 0}</span>
-                                                <span className="text-gray-400">จาก {group.capacity}</span>
+                                                )) : <span className="text-xs text-red-400 italic">ยังไม่ระบุ</span>}
                                             </div>
-                                            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                                                <div
-                                                    className={`h-1.5 rounded-full ${((group._count?.students || 0) / group.capacity) >= 1 ? 'bg-red-500' : 'bg-green-500'}`}
-                                                    style={{ width: `${Math.min(((group._count?.students || 0) / group.capacity) * 100, 100)}%` }}
-                                                ></div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap align-middle">
+                                            <div className="w-full max-w-[140px]">
+                                                <div className="flex justify-between text-xs mb-1">
+                                                    <span className="font-medium text-gray-600">รับแล้ว {count}</span>
+                                                    <span className="text-gray-400">จาก {group.capacity}</span>
+                                                </div>
+                                                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                                    <div className={`h-1.5 rounded-full ${ratio >= 1 ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${Math.min(ratio * 100, 100)}%` }}></div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${group.isActive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${group.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                            {group.isActive ? 'เปิดรับ' : 'ปิดรับ'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="flex justify-end space-x-2">
-                                            <button onClick={() => openEdit(group)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="แก้ไข">
-                                                <i className="fas fa-pen"></i>
-                                            </button>
-                                            <button onClick={() => openDelete(group)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="ลบ">
-                                                <i className="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                            {initialGroups.length === 0 && (
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${group.isActive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${group.isActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                                {group.isActive ? 'เปิดรับ' : 'ปิดรับ'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div className="flex justify-end space-x-1">
+                                                <button onClick={() => setModal({ type: 'members', groupId: group.id })} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors" title="จัดการนักศึกษาในกลุ่ม">
+                                                    <i className="fas fa-user-plus mr-1"></i> นักศึกษา
+                                                </button>
+                                                <button onClick={() => setModal({ type: 'edit', groupId: group.id })} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="แก้ไข">
+                                                    <i className="fas fa-pen"></i>
+                                                </button>
+                                                <button onClick={() => setModal({ type: 'delete', groupId: group.id })} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="ลบ">
+                                                    <i className="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {filtered.length === 0 && (
                                 <tr>
                                     <td colSpan="6" className="px-6 py-10 text-center text-sm text-gray-500 bg-gray-50/50">
-                                        <div className="flex flex-col items-center justify-center">
-                                            <i className="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
-                                            <p>ไม่พบข้อมูลกลุ่มฝึกงาน</p>
-                                            <button onClick={openAdd} className="mt-4 text-blue-600 hover:underline text-sm font-medium">
-                                                สร้างกลุ่มใหม่ +
-                                            </button>
-                                        </div>
+                                        <i className="fas fa-inbox text-4xl text-gray-300 mb-3 block"></i>
+                                        {groups.length === 0 ? 'ยังไม่มีกลุ่มฝึกงาน' : 'ไม่พบกลุ่มฝึกงานที่ตรงกับเงื่อนไข'}
                                     </td>
                                 </tr>
                             )}
@@ -277,336 +151,244 @@ export default function GroupList({ initialGroups = [], locations = [], teachers
                 </div>
             </div>
 
-            {/* Reuseable Form Modal Content (Internal Component) */}
-            {/* Note: In a larger app, this would be a separate file */}
-
-            {/* Add Modal */}
-            {isAddModalOpen && (
-                <div className="fixed inset-0 z-50 overflow-y-auto font-sans" role="dialog" aria-modal="true">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 bg-opacity-60 transition-opacity" onClick={() => setIsAddModalOpen(false)}></div>
-                        <span className="hidden sm:inline-block sm:align-top sm:h-screen" aria-hidden="true">&#8203;</span>
-                        <div className="inline-block align-top bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:mt-24 sm:align-top sm:max-w-2xl w-full relative z-10">
-                            <form action={handleCreate}>
-                                <div className="bg-white px-6 py-6">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                                            <span className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 text-lg">
-                                                <i className="fas fa-plus"></i>
-                                            </span>
-                                            สร้างกลุ่มฝึกงานใหม่
-                                        </h3>
-                                        <button type="button" onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-500 focus:outline-none">
-                                            <i className="fas fa-times text-xl"></i>
-                                        </button>
-                                    </div>
-
-                                    {error && <div className="mb-6 px-4 py-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded-r shadow-sm">
-                                        <span className="font-bold mr-2">ผิดพลาด!</span> {error}
-                                    </div>}
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Left Column: Basic Info */}
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อกลุ่มฝึกงาน <span className="text-red-500">*</span></label>
-                                                <input type="text" name="name" required placeholder="ระบุชื่อกลุ่ม..." className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">รุ่นปีการศึกษา <span className="text-red-500">*</span></label>
-                                                <input type="text" name="generation" required placeholder="เช่น 66" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">สถานที่ฝึกงาน <span className="text-red-500">*</span></label>
-                                                <select name="locationId" required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border bg-white">
-                                                    <option value="">-- เลือกสถานที่ --</option>
-                                                    {locations.map(loc => (
-                                                        <option key={loc.id} value={loc.id}>{loc.name} ({loc.province})</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">เริ่มวันที่</label>
-                                                    <input type="date" name="startDate" required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">ถึงวันที่</label>
-                                                    <input type="date" name="endDate" required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Right Column: Advisors & Details */}
-                                        <div className="space-y-4">
-                                            {/* Custom Advisor Selector */}
-                                            <div ref={advisorDropdownRef} className="relative">
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">อาจารย์ที่ปรึกษา</label>
-                                                {/* Hidden inputs to submit standard form data */}
-                                                {selectedAdvisors.map(teacher => (
-                                                    <input key={teacher.id} type="hidden" name="advisorIds" value={teacher.id} />
-                                                ))}
-
-                                                <div className="bg-white border border-gray-300 rounded-lg p-2 min-h-[42px] flex flex-wrap gap-2 focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500">
-                                                    {selectedAdvisors.map(teacher => (
-                                                        <span key={teacher.id} className="inline-flex items-center px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100 animate-fadeIn">
-                                                            {teacher.prefix}{teacher.firstName} {teacher.lastName}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleRemoveAdvisor(teacher.id)}
-                                                                className="ml-1.5 text-blue-400 hover:text-blue-600 focus:outline-none"
-                                                            >
-                                                                <i className="fas fa-times"></i>
-                                                            </button>
-                                                        </span>
-                                                    ))}
-                                                    <input
-                                                        type="text"
-                                                        className="flex-1 outline-none text-sm min-w-[100px] bg-transparent"
-                                                        placeholder={selectedAdvisors.length === 0 ? "ค้นหาอาจารย์..." : ""}
-                                                        value={advisorSearch}
-                                                        onChange={(e) => {
-                                                            setAdvisorSearch(e.target.value);
-                                                            setIsAdvisorDropdownOpen(true);
-                                                        }}
-                                                        onFocus={() => setIsAdvisorDropdownOpen(true)}
-                                                    />
-                                                </div>
-
-                                                {/* Dropdown Results */}
-                                                {isAdvisorDropdownOpen && filteredTeachers.length > 0 && (
-                                                    <div className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-48 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm animate-fadeIn">
-                                                        {filteredTeachers.map(teacher => (
-                                                            <div
-                                                                key={teacher.id}
-                                                                className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-blue-50 hover:text-blue-900 text-gray-900 border-b border-gray-50 last:border-0"
-                                                                onClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    e.stopPropagation();
-                                                                    handleAddAdvisor(teacher);
-                                                                }}
-                                                            >
-                                                                <div className="flex items-center">
-                                                                    <div className="ml-2">
-                                                                        <span className="block font-medium">{teacher.prefix}{teacher.firstName} {teacher.lastName}</span>
-                                                                        <span className="block text-xs text-gray-500">{teacher.email}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">จำนวนรับ (คน)</label>
-                                                <input type="number" name="capacity" defaultValue={5} min="1" required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">รายละเอียดเพิ่มเติม</label>
-                                                <textarea name="description" rows="3" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border resize-none"></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="bg-white px-6 py-4 flex flex-row-reverse border-t border-gray-100">
-                                    <button type="submit" className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-6 py-2.5 bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto transition-all">
-                                        บันทึกข้อมูล
-                                    </button>
-                                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-6 py-2.5 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto transition-all">
-                                        ยกเลิก
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+            {modal?.type === 'add' && (
+                <GroupFormModal key="add" locations={locations} teachers={teachers} onClose={closeModal} />
             )}
-
-            {/* Edit Modal - Reusing structure but with defaultValue */}
-            {isEditModalOpen && currentGroup && (
-                <div className="fixed inset-0 z-50 overflow-y-auto font-sans" role="dialog" aria-modal="true">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm transition-opacity" onClick={() => setIsEditModalOpen(false)}></div>
-                        <span className="hidden sm:inline-block sm:align-top sm:h-screen" aria-hidden="true">&#8203;</span>
-                        <div className="inline-block align-top bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:mt-24 sm:align-top sm:max-w-2xl w-full relative z-10">
-                            <form action={handleUpdate}>
-                                <div className="bg-white px-6 py-6">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                                            <span className="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center mr-3 text-lg">
-                                                <i className="fas fa-edit"></i>
-                                            </span>
-                                            แก้ไขกลุ่มฝึกงาน
-                                        </h3>
-                                        <div className="flex items-center gap-4">
-                                            <label className="inline-flex items-center cursor-pointer">
-                                                <input type="checkbox" name="isActive" value="true" defaultChecked={currentGroup.isActive} className="sr-only peer" />
-                                                <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                                <span className="ms-3 text-sm font-medium text-gray-700">เปิดรับ</span>
-                                            </label>
-                                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-500 focus:outline-none">
-                                                <i className="fas fa-times text-xl"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {error && <div className="mb-6 px-4 py-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded-r shadow-sm">
-                                        <span className="font-bold mr-2">ผิดพลาด!</span> {error}
-                                    </div>}
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Left Column: Basic Info */}
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อกลุ่มฝึกงาน <span className="text-red-500">*</span></label>
-                                                <input type="text" name="name" defaultValue={currentGroup.name} required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">รุ่นปีการศึกษา <span className="text-red-500">*</span></label>
-                                                <input type="text" name="generation" defaultValue={currentGroup.generation} required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">สถานที่ฝึกงาน <span className="text-red-500">*</span></label>
-                                                <select name="locationId" defaultValue={currentGroup.locationId} required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border bg-white">
-                                                    {locations.map(loc => (
-                                                        <option key={loc.id} value={loc.id}>{loc.name} ({loc.province})</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">เริ่มวันที่</label>
-                                                    <input type="date" name="startDate" defaultValue={formatDate(currentGroup.startDate, 'value')} required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">ถึงวันที่</label>
-                                                    <input type="date" name="endDate" defaultValue={formatDate(currentGroup.endDate, 'value')} required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Right Column: Advisors & Details */}
-                                        <div className="space-y-4">
-                                            {/* Custom Advisor Selector */}
-                                            <div ref={advisorDropdownRef} className="relative">
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">อาจารย์ที่ปรึกษา</label>
-                                                {/* Hidden inputs to submit standard form data */}
-                                                {selectedAdvisors.map(teacher => (
-                                                    <input key={teacher.id} type="hidden" name="advisorIds" value={teacher.id} />
-                                                ))}
-
-                                                <div className="bg-white border border-gray-300 rounded-lg p-2 min-h-[42px] flex flex-wrap gap-2 focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500">
-                                                    {selectedAdvisors.map(teacher => (
-                                                        <span key={teacher.id} className="inline-flex items-center px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100 animate-fadeIn">
-                                                            {teacher.prefix}{teacher.firstName} {teacher.lastName}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleRemoveAdvisor(teacher.id)}
-                                                                className="ml-1.5 text-blue-400 hover:text-blue-600 focus:outline-none"
-                                                            >
-                                                                <i className="fas fa-times"></i>
-                                                            </button>
-                                                        </span>
-                                                    ))}
-                                                    <input
-                                                        type="text"
-                                                        className="flex-1 outline-none text-sm min-w-[100px] bg-transparent"
-                                                        placeholder={selectedAdvisors.length === 0 ? "ค้นหาอาจารย์..." : ""}
-                                                        value={advisorSearch}
-                                                        onChange={(e) => {
-                                                            setAdvisorSearch(e.target.value);
-                                                            setIsAdvisorDropdownOpen(true);
-                                                        }}
-                                                        onFocus={() => setIsAdvisorDropdownOpen(true)}
-                                                    />
-                                                </div>
-
-                                                {/* Dropdown Results */}
-                                                {isAdvisorDropdownOpen && filteredTeachers.length > 0 && (
-                                                    <div className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-48 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm animate-fadeIn">
-                                                        {filteredTeachers.map(teacher => (
-                                                            <div
-                                                                key={teacher.id}
-                                                                className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-blue-50 hover:text-blue-900 text-gray-900 border-b border-gray-50 last:border-0"
-                                                                onClick={() => handleAddAdvisor(teacher)}
-                                                            >
-                                                                <div className="flex items-center">
-                                                                    <div className="ml-2">
-                                                                        <span className="block font-medium">{teacher.prefix}{teacher.firstName} {teacher.lastName}</span>
-                                                                        <span className="block text-xs text-gray-500">{teacher.email}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">จำนวนรับ (คน)</label>
-                                                <input type="number" name="capacity" defaultValue={currentGroup.capacity} min="1" required className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border" />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">รายละเอียดเพิ่มเติม</label>
-                                                <textarea name="description" defaultValue={currentGroup.description} rows="3" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2.5 px-3 border resize-none"></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="bg-white px-6 py-4 flex flex-row-reverse border-t border-gray-100">
-                                    <button type="submit" className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-6 py-2.5 bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto transition-all">
-                                        บันทึกการแก้ไข
-                                    </button>
-                                    <button type="button" onClick={() => setIsEditModalOpen(false)} className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-6 py-2.5 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto transition-all">
-                                        ยกเลิก
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+            {modal?.type === 'edit' && modalGroup && (
+                <GroupFormModal key={`edit-${modalGroup.id}`} group={modalGroup} locations={locations} teachers={teachers} onClose={closeModal} />
             )}
-
-            {/* Delete Modal - Modernized */}
-            {isDeleteModalOpen && currentGroup && (
-                <div className="fixed inset-0 z-50 overflow-y-auto font-sans">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm transition-opacity" onClick={() => setIsDeleteModalOpen(false)}></div>
-                        <span className="hidden sm:inline-block sm:align-top sm:h-screen" aria-hidden="true">&#8203;</span>
-                        <div className="inline-block align-top bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:mt-24 sm:align-top sm:max-w-lg w-full relative z-10">
-                            <div className="bg-white px-6 py-6">
-                                <div className="sm:flex sm:items-start">
-                                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-12 sm:w-12">
-                                        <i className="fas fa-exclamation-triangle text-red-600 text-lg"></i>
-                                    </div>
-                                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                                        <h3 className="text-xl leading-6 font-bold text-gray-900">
-                                            ยืนยันการลบ
-                                        </h3>
-                                        <div className="mt-2">
-                                            <p className="text-sm text-gray-500">
-                                                คุณต้องการลบกลุ่มฝึกงาน <span className="font-bold text-gray-800">{currentGroup.name}</span> ใช่หรือไม่?
-                                                <br />การกระทำนี้ไม่สามารถย้อนกลับได้ และอาจส่งผลกระทบต่อนักศึกษาในกลุ่ม
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-white px-6 py-4 sm:flex sm:flex-row-reverse border-t border-gray-100">
-                                <button type="button" onClick={handleDelete} className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition-all">
-                                    ยืนยันการลบ
-                                </button>
-                                <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-all">
-                                    ยกเลิก
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            {modal?.type === 'members' && modalGroup && (
+                <MembersModal group={modalGroup} students={students} onClose={closeModal} />
+            )}
+            {modal?.type === 'delete' && modalGroup && (
+                <ConfirmDelete title="ยืนยันการลบกลุ่มฝึกงาน" action={() => deleteGroup(modalGroup.id)} onDone={closeModal} onClose={closeModal}>
+                    คุณต้องการลบกลุ่ม <b>{modalGroup.name}</b> ใช่หรือไม่?
+                    {modalGroup._count.students > 0 && <> นักศึกษา {modalGroup._count.students} คนในกลุ่มจะกลับไปเป็น &quot;ยังไม่มีกลุ่ม&quot;</>}
+                </ConfirmDelete>
             )}
         </>
+    );
+}
+
+function GroupFormModal({ group, locations, teachers, onClose }) {
+    const isEdit = Boolean(group);
+    const { run, isPending, error } = useServerAction();
+    const [advisors, setAdvisors] = useState(group?.advisors ?? []);
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        run(() => (isEdit ? updateGroup(group.id, formData) : createGroup(formData)), onClose);
+    };
+
+    return (
+        <Modal title={isEdit ? 'แก้ไขกลุ่มฝึกงาน' : 'สร้างกลุ่มฝึกงานใหม่'} icon={isEdit ? 'fa-edit' : 'fa-plus'} iconClass={isEdit ? 'bg-yellow-100 text-yellow-600' : 'bg-blue-100 text-blue-600'} onClose={onClose}>
+            <form onSubmit={handleSubmit}>
+                <div className="px-6 pb-6">
+                    <ErrorAlert>{error}</ErrorAlert>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div>
+                                <label className={labelClass}>ชื่อกลุ่มฝึกงาน <span className="text-red-500">*</span></label>
+                                <input type="text" name="name" required defaultValue={group?.name} placeholder="เช่น กลุ่มฝึกงานที่ 1" className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>รุ่นปีการศึกษา <span className="text-red-500">*</span></label>
+                                <input type="text" name="generation" required defaultValue={group?.generation} placeholder="เช่น 66" className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>สถานที่ฝึกงาน <span className="text-red-500">*</span></label>
+                                <select name="locationId" required defaultValue={group?.locationId ?? ''} className={inputClass}>
+                                    <option value="">-- เลือกสถานที่ --</option>
+                                    {locations.filter(l => l.status === 'ACTIVE' || l.id === group?.locationId).map(loc => (
+                                        <option key={loc.id} value={loc.id}>{loc.name} ({loc.province}){loc.status === 'ACTIVE' ? '' : ' - ปิดใช้งาน'}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className={labelClass}>เริ่มวันที่ <span className="text-red-500">*</span></label>
+                                    <input type="date" name="startDate" required defaultValue={toDayInputValue(group?.startDate)} className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>ถึงวันที่ <span className="text-red-500">*</span></label>
+                                    <input type="date" name="endDate" required defaultValue={toDayInputValue(group?.endDate)} className={inputClass} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <AdvisorPicker teachers={teachers} selected={advisors} onChange={setAdvisors} />
+                            <div>
+                                <label className={labelClass}>จำนวนรับ (คน) <span className="text-red-500">*</span></label>
+                                <input type="number" name="capacity" required min="1" defaultValue={group?.capacity ?? 5} className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>รายละเอียดเพิ่มเติม</label>
+                                <textarea name="description" rows="3" defaultValue={group?.description ?? ''} className={`${inputClass} resize-none`}></textarea>
+                            </div>
+                            {isEdit && (
+                                <label className="inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="isActive" value="true" defaultChecked={group.isActive} className="w-4 h-4 text-blue-600 rounded border-gray-300" />
+                                    <span className="ml-2 text-sm font-medium text-gray-700">เปิดรับนักศึกษา</span>
+                                </label>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <FormActions isPending={isPending} submitLabel={isEdit ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูล'} onCancel={onClose} />
+            </form>
+        </Modal>
+    );
+}
+
+function AdvisorPicker({ teachers, selected, onChange }) {
+    const [search, setSearch] = useState('');
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const onMouseDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', onMouseDown);
+        return () => document.removeEventListener('mousedown', onMouseDown);
+    }, []);
+
+    const term = search.trim().toLowerCase();
+    const options = teachers.filter(t =>
+        !selected.some(s => s.id === t.id) &&
+        (!term || `${t.firstName} ${t.lastName}`.toLowerCase().includes(term))
+    );
+
+    return (
+        <div ref={ref} className="relative">
+            <label className={labelClass}>อาจารย์ที่ปรึกษา</label>
+            {selected.map(t => <input key={t.id} type="hidden" name="advisorIds" value={t.id} />)}
+            <div className="bg-white border border-gray-300 rounded-lg p-2 min-h-[42px] flex flex-wrap gap-2 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500">
+                {selected.map(t => (
+                    <span key={t.id} className="inline-flex items-center px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
+                        {personName(t)}
+                        <button type="button" onClick={() => onChange(selected.filter(s => s.id !== t.id))} className="ml-1.5 text-blue-400 hover:text-blue-600" aria-label="เอาออก">
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </span>
+                ))}
+                <input
+                    type="text"
+                    className="flex-1 outline-none text-sm min-w-[100px] bg-transparent"
+                    placeholder={selected.length === 0 ? 'ค้นหาอาจารย์...' : ''}
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+                    onFocus={() => setOpen(true)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                />
+            </div>
+            {open && (
+                <div className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-48 rounded-md py-1 ring-1 ring-black/5 overflow-auto text-sm">
+                    {options.length > 0 ? options.map(t => (
+                        <button
+                            type="button"
+                            key={t.id}
+                            className="block w-full text-left py-2 px-3 hover:bg-blue-50 border-b border-gray-50 last:border-0"
+                            onClick={() => { onChange([...selected, t]); setSearch(''); }}
+                        >
+                            <span className="block font-medium text-gray-900">{personName(t)}</span>
+                            <span className="block text-xs text-gray-500">{t.email}</span>
+                        </button>
+                    )) : (
+                        <p className="py-2 px-3 text-gray-500">{teachers.length === 0 ? 'ยังไม่มีอาจารย์ในระบบ (เพิ่มได้ที่เมนูจัดการผู้ใช้งาน)' : 'ไม่พบอาจารย์'}</p>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Assign / remove students for one group.
+function MembersModal({ group, students, onClose }) {
+    const { run, isPending, error, setError } = useServerAction();
+    const [search, setSearch] = useState('');
+    const [selected, setSelected] = useState([]);
+
+    const members = students.filter(s => s.trainingGroupId === group.id);
+    const free = group.capacity - members.length;
+
+    const term = search.trim().toLowerCase();
+    const candidates = students.filter(s =>
+        s.trainingGroupId !== group.id &&
+        (!term || `${s.firstName} ${s.lastName} ${s.studentId ?? ''}`.toLowerCase().includes(term))
+    );
+    // Students who already belong to another group are listed last.
+    candidates.sort((a, b) => Number(Boolean(a.trainingGroupId)) - Number(Boolean(b.trainingGroupId)));
+
+    const toggle = (id) => {
+        setError('');
+        setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const handleAdd = () => run(() => addStudentsToGroup(group.id, selected), () => setSelected([]));
+
+    return (
+        <Modal title={`นักศึกษาในกลุ่ม: ${group.name}`} icon="fa-user-plus" size="xl" onClose={onClose}>
+            <div className="px-6 pb-4">
+                <ErrorAlert>{error}</ErrorAlert>
+                <div className="flex items-center justify-between mb-4 text-sm">
+                    <span className="text-gray-600">รับแล้ว <b>{members.length}</b> จาก {group.capacity} คน</span>
+                    <span className={free > 0 ? 'text-green-600' : 'text-red-600'}>{free > 0 ? `ว่างอีก ${free} ที่` : 'กลุ่มเต็มแล้ว'}</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">สมาชิกในกลุ่ม</h4>
+                        <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                            {members.map(s => (
+                                <li key={s.id} className="flex items-center justify-between px-3 py-2">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate">{personName(s)}</p>
+                                        <p className="text-xs text-gray-500">{s.studentId || 'ไม่มีรหัสนักศึกษา'}</p>
+                                    </div>
+                                    <button
+                                        type="button" disabled={isPending}
+                                        onClick={() => run(() => removeStudentFromGroup(s.id))}
+                                        className="text-red-500 hover:text-red-700 text-xs px-2 py-1 hover:bg-red-50 rounded"
+                                    >
+                                        <i className="fas fa-user-minus mr-1"></i>นำออก
+                                    </button>
+                                </li>
+                            ))}
+                            {members.length === 0 && <li className="px-3 py-6 text-center text-sm text-gray-400">ยังไม่มีนักศึกษาในกลุ่มนี้</li>}
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">เพิ่มนักศึกษา</h4>
+                        <SearchBox value={search} onChange={setSearch} placeholder="ค้นหาชื่อ / รหัสนักศึกษา..." />
+                        <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-64 overflow-y-auto mt-2">
+                            {candidates.map(s => (
+                                <li key={s.id}>
+                                    <label className="flex items-center px-3 py-2 cursor-pointer hover:bg-gray-50">
+                                        <input type="checkbox" checked={selected.includes(s.id)} onChange={() => toggle(s.id)} className="w-4 h-4 text-blue-600 rounded border-gray-300 mr-3" />
+                                        <span className="min-w-0">
+                                            <span className="block text-sm font-medium text-gray-900 truncate">{personName(s)}</span>
+                                            <span className="block text-xs text-gray-500">
+                                                {s.studentId || 'ไม่มีรหัสนักศึกษา'}{s.academicYear ? ` · รุ่น ${s.academicYear}` : ''}
+                                                {s.trainingGroupId ? <span className="text-orange-500"> · อยู่กลุ่มอื่น (จะย้ายมากลุ่มนี้)</span> : null}
+                                            </span>
+                                        </span>
+                                    </label>
+                                </li>
+                            ))}
+                            {candidates.length === 0 && <li className="px-3 py-6 text-center text-sm text-gray-400">ไม่พบนักศึกษา</li>}
+                        </ul>
+                        <button type="button" onClick={handleAdd} disabled={isPending || selected.length === 0} className={`${primaryButton} w-full mt-3`}>
+                            <i className="fas fa-plus mr-2"></i>
+                            {isPending ? 'กำลังบันทึก...' : `เพิ่มนักศึกษาที่เลือก (${selected.length})`}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div className="px-6 py-4 flex justify-end border-t border-gray-100 bg-gray-50">
+                <button type="button" onClick={onClose} className={secondaryButton}>ปิด</button>
+            </div>
+        </Modal>
     );
 }
