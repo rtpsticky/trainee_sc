@@ -21,25 +21,7 @@ async function main() {
         },
     })
 
-    // Create Student User
-    const student = await prisma.user.upsert({
-        where: { username: 'std63001' },
-        update: {},
-        create: {
-            username: 'std63001',
-            password: hashedPassword,
-            email: 'std63001@example.com',
-            prefix: 'นาย',
-            firstName: 'สมชาย',
-            lastName: 'รักเรียน',
-            role: 'STUDENT',
-            studentId: '63001',
-            major: 'สาธารณสุขศาสตร์',
-            status: 'ACTIVE',
-        },
-    })
-
-    console.log({ staff, student })
+    console.log({ staff })
 }
 
 main()
