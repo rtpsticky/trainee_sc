@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     createGroup, updateGroup, deleteGroup, addStudentsToGroup, removeStudentFromGroup,
 } from '../actions/groups';
+import { createMentor, updateMentor, deleteMentor } from '../actions/mentors';
 import Modal from '../components/Modal';
 import {
     ConfirmDelete, ErrorAlert, FormActions, SearchBox, StatCard,
@@ -127,6 +128,9 @@ export default function GroupList({ groups, locations, teachers, students }) {
                                                 <button onClick={() => setModal({ type: 'members', groupId: group.id })} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors" title="จัดการนักศึกษาในกลุ่ม">
                                                     <i className="fas fa-user-plus mr-1"></i> นักศึกษา
                                                 </button>
+                                                <button onClick={() => setModal({ type: 'mentors', groupId: group.id })} className="px-3 py-1.5 text-xs text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors" title="จัดการพี่เลี้ยงในกลุ่ม">
+                                                    <i className="fas fa-user-nurse mr-1"></i> พี่เลี้ยง{group.mentors.length > 0 ? ` (${group.mentors.length})` : ''}
+                                                </button>
                                                 <button onClick={() => setModal({ type: 'edit', groupId: group.id })} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="แก้ไข">
                                                     <i className="fas fa-pen"></i>
                                                 </button>
@@ -159,6 +163,9 @@ export default function GroupList({ groups, locations, teachers, students }) {
             )}
             {modal?.type === 'members' && modalGroup && (
                 <MembersModal group={modalGroup} students={students} onClose={closeModal} />
+            )}
+            {modal?.type === 'mentors' && modalGroup && (
+                <MentorsModal group={modalGroup} onClose={closeModal} />
             )}
             {modal?.type === 'delete' && modalGroup && (
                 <ConfirmDelete title="ยืนยันการลบกลุ่มฝึกงาน" action={() => deleteGroup(modalGroup.id)} onDone={closeModal} onClose={closeModal}>
@@ -389,6 +396,124 @@ function MembersModal({ group, students, onClose }) {
             <div className="px-6 py-4 flex justify-end border-t border-gray-100 bg-gray-50">
                 <button type="button" onClick={onClose} className={secondaryButton}>ปิด</button>
             </div>
+        </Modal>
+    );
+}
+
+// Manage the on-site mentors (พี่เลี้ยง) attached to one group: list, add, edit, delete.
+function MentorsModal({ group, onClose }) {
+    const { run, isPending, error, setError } = useServerAction();
+    // form: null (showing the list) | 'add' | the mentor object being edited
+    const [form, setForm] = useState(null);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+
+    const openAdd = () => { setError(''); setForm('add'); };
+    const openEdit = (mentor) => { setError(''); setForm(mentor); };
+    const isEdit = form && form !== 'add';
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        run(() => (isEdit ? updateMentor(form.id, formData) : createMentor(group.id, formData)), () => setForm(null));
+    };
+
+    return (
+        <Modal title={`พี่เลี้ยงในกลุ่ม: ${group.name}`} icon="fa-user-nurse" iconClass="bg-teal-100 text-teal-600" onClose={onClose}>
+            <div className="px-6 pb-4">
+                <ErrorAlert>{error}</ErrorAlert>
+
+                {!form ? (
+                    <>
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-gray-700">รายชื่อพี่เลี้ยง ({group.mentors.length})</h4>
+                            <button type="button" onClick={openAdd} className={primaryButton}>
+                                <i className="fas fa-plus mr-2"></i>เพิ่มพี่เลี้ยง
+                            </button>
+                        </div>
+                        <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                            {group.mentors.map(m => (
+                                <li key={m.id} className="flex items-center justify-between px-4 py-3">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate">
+                                            {m.prefix}{m.firstName} {m.lastName}
+                                            {m.position && <span className="text-gray-500 font-normal"> · {m.position}</span>}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            <i className="fas fa-phone-alt mr-1"></i>{m.phone}
+                                            {m.email && <span className="ml-3"><i className="fas fa-envelope mr-1"></i>{m.email}</span>}
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-1 flex-shrink-0 ml-3">
+                                        <button type="button" onClick={() => openEdit(m)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="แก้ไข">
+                                            <i className="fas fa-pen"></i>
+                                        </button>
+                                        <button type="button" onClick={() => setDeleteTarget(m)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="ลบ">
+                                            <i className="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
+                            {group.mentors.length === 0 && (
+                                <li className="px-4 py-8 text-center text-sm text-gray-400">ยังไม่มีพี่เลี้ยงในกลุ่มนี้</li>
+                            )}
+                        </ul>
+                    </>
+                ) : (
+                    <form onSubmit={handleSubmit}>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">{isEdit ? 'แก้ไขข้อมูลพี่เลี้ยง' : 'เพิ่มพี่เลี้ยงใหม่'}</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className={labelClass}>คำนำหน้า</label>
+                                <input type="text" name="prefix" defaultValue={isEdit ? form.prefix ?? '' : ''} placeholder="นาย, นางสาว" className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>ชื่อจริง <span className="text-red-500">*</span></label>
+                                <input type="text" name="firstName" required defaultValue={isEdit ? form.firstName : ''} className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>นามสกุล <span className="text-red-500">*</span></label>
+                                <input type="text" name="lastName" required defaultValue={isEdit ? form.lastName : ''} className={inputClass} />
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <label className={labelClass}>ตำแหน่ง</label>
+                            <input type="text" name="position" defaultValue={isEdit ? form.position ?? '' : ''} placeholder="เช่น พยาบาลวิชาชีพ, หัวหน้าหอผู้ป่วย" className={inputClass} />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div>
+                                <label className={labelClass}>เบอร์โทรติดต่อ <span className="text-red-500">*</span></label>
+                                <input type="tel" name="phone" required defaultValue={isEdit ? form.phone : ''} className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>อีเมล</label>
+                                <input type="email" name="email" defaultValue={isEdit ? form.email ?? '' : ''} className={inputClass} />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button type="button" onClick={() => setForm(null)} className={secondaryButton}>ยกเลิก</button>
+                            <button type="submit" disabled={isPending} className={primaryButton}>
+                                {isPending ? 'กำลังบันทึก...' : 'บันทึก'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </div>
+            {!form && (
+                <div className="px-6 py-4 flex justify-end border-t border-gray-100 bg-gray-50">
+                    <button type="button" onClick={onClose} className={secondaryButton}>ปิด</button>
+                </div>
+            )}
+
+            {deleteTarget && (
+                <ConfirmDelete
+                    title="ยืนยันการลบพี่เลี้ยง"
+                    action={() => deleteMentor(deleteTarget.id)}
+                    onDone={() => setDeleteTarget(null)}
+                    onClose={() => setDeleteTarget(null)}
+                >
+                    คุณต้องการลบพี่เลี้ยง <b>{deleteTarget.prefix}{deleteTarget.firstName} {deleteTarget.lastName}</b> ออกจากกลุ่มนี้ใช่หรือไม่?
+                </ConfirmDelete>
+            )}
         </Modal>
     );
 }

@@ -128,11 +128,32 @@ model TrainingGroup {
 
   students User[] @relation("GroupStudents")
   advisors User[] @relation("GroupAdvisors")
+  mentors  Mentor[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("training_groups")
+}
+
+// พี่เลี้ยง: on-site staff at the training location who supervise students day-to-day.
+// They are not system users (no login) - just contact records attached to a group.
+model Mentor {
+  id        Int     @id @default(autoincrement())
+  prefix    String? // e.g. นาย, นางสาว
+  firstName String
+  lastName  String
+  position  String? // ตำแหน่ง เช่น พยาบาลวิชาชีพ, หัวหน้าหอผู้ป่วย
+  phone     String // เบอร์โทรติดต่อ
+  email     String?
+
+  trainingGroupId Int
+  trainingGroup   TrainingGroup @relation(fields: [trainingGroupId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("mentors")
 }
 
 // From follow.html

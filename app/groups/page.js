@@ -13,6 +13,7 @@ export default async function TrainingGroupsPage() {
             include: {
                 location: true,
                 advisors: { select: { id: true, prefix: true, firstName: true, lastName: true, email: true } },
+                mentors: { orderBy: { id: 'asc' } },
                 _count: { select: { students: true } },
             },
             orderBy: { id: 'desc' },
