@@ -101,24 +101,6 @@ export default function LandingPage({ settings }) {
                 </div>
             </section>
 
-            {/* Info band */}
-            <section className="bg-blue-50 border-t border-blue-100">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
-                    <div>
-                        <p className="text-sm text-gray-500">ปีการศึกษาปัจจุบัน</p>
-                        <p className="text-xl font-bold text-blue-900">{settings.ACADEMIC_YEAR} / {settings.SEMESTER}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">ผู้ใช้งานระบบ</p>
-                        <p className="text-xl font-bold text-blue-900">นักศึกษา &amp; อาจารย์ที่ปรึกษา</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">ติดต่อผู้ดูแลระบบ</p>
-                        <p className="text-xl font-bold text-blue-900">{settings.CONTACT_EMAIL}</p>
-                    </div>
-                </div>
-            </section>
-
             {/* Footer */}
             <footer className="bg-blue-950 text-blue-100">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
