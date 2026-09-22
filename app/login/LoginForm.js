@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { login } from '../actions/auth'
 
 export default function LoginForm({ systemName }) {
@@ -77,6 +78,10 @@ export default function LoginForm({ systemName }) {
                             {isPending ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
                         </button>
                     </div>
+
+                    <p className="text-center text-sm text-gray-600">
+                        ยังไม่มีบัญชี? <Link href="/register" className="font-medium text-blue-600 hover:text-blue-800">สมัครสมาชิก</Link>
+                    </p>
                 </form>
             </div>
         </div>

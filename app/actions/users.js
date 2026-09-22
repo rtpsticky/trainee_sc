@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs'
 import { authorize, MANAGE_ROLES } from '../lib/auth'
 
 const ROLES = ['STUDENT', 'TEACHER', 'STAFF', 'ADMIN']
-const STATUSES = ['ACTIVE', 'INACTIVE']
+const STATUSES = ['PENDING', 'ACTIVE', 'INACTIVE']
 const MIN_PASSWORD_LENGTH = 6
 
 const text = (formData, key) => String(formData.get(key) ?? '').trim()
@@ -162,6 +162,40 @@ export async function updateUser(id, formData) {
         console.error('Update User Error:', error)
         if (error.code === 'P2025') return { error: 'ไม่พบผู้ใช้งานนี้ อาจถูกลบไปแล้ว' }
         return { error: uniqueError(error) || 'เกิดข้อผิดพลาดในการแก้ไขผู้ใช้งาน' }
+    }
+}
+
+// Approves a self-registered (PENDING) student/advisor account so it can sign in.
+export async function approveUser(id) {
+    const auth = await authorize(MANAGE_ROLES)
+    if (auth.error) return { error: auth.error }
+
+    const userId = parseInt(id, 10)
+    try {
+        await prisma.user.update({ where: { id: userId }, data: { status: 'ACTIVE' } })
+        revalidatePath('/', 'layout')
+        return { success: true }
+    } catch (error) {
+        console.error('Approve User Error:', error)
+        if (error.code === 'P2025') return { error: 'ไม่พบคำขอสมัครสมาชิกนี้ อาจถูกลบไปแล้ว' }
+        return { error: 'เกิดข้อผิดพลาดในการอนุมัติผู้ใช้งาน' }
+    }
+}
+
+// Rejects a pending self-registration by removing the request entirely.
+export async function rejectUser(id) {
+    const auth = await authorize(MANAGE_ROLES)
+    if (auth.error) return { error: auth.error }
+
+    const userId = parseInt(id, 10)
+    try {
+        await prisma.user.delete({ where: { id: userId } })
+        revalidatePath('/', 'layout')
+        return { success: true }
+    } catch (error) {
+        console.error('Reject User Error:', error)
+        if (error.code === 'P2025') return { error: 'ไม่พบคำขอสมัครสมาชิกนี้ อาจถูกลบไปแล้ว' }
+        return { error: 'เกิดข้อผิดพลาดในการปฏิเสธคำขอ' }
     }
 }
 

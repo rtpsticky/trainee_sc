@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import AppShell from './components/AppShell';
+import LandingPage from './LandingPage';
 import { getCurrentUser } from './lib/auth';
-import { redirect } from 'next/navigation';
 import { getDashboardStats } from './lib/reports';
 import { getRecentActivities, getUpcomingSupervisions, getStudentGroup } from './lib/dashboard';
 import { getSettingsMap } from './lib/settings';
@@ -11,9 +11,10 @@ export const metadata = { title: 'หน้าหลัก' };
 
 export default async function Dashboard() {
   const user = await getCurrentUser();
-  if (!user) redirect('/login');
-
   const settings = await getSettingsMap();
+
+  if (!user) return <LandingPage settings={settings} />;
+
   const semesterLabel = `ภาคการศึกษา ${settings.SEMESTER}/${settings.ACADEMIC_YEAR}`;
 
   if (user.role === 'STUDENT') {

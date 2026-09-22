@@ -20,6 +20,9 @@ export async function login(prevState, formData) {
             return { message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', username }
         }
 
+        if (user.status === 'PENDING') {
+            return { message: 'บัญชีนี้กำลังรอการอนุมัติจากผู้ดูแลระบบ กรุณาลองใหม่อีกครั้งภายหลัง', username }
+        }
         if (user.status !== 'ACTIVE') {
             return { message: 'บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อเจ้าหน้าที่', username }
         }

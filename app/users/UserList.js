@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { createUser, updateUser, deleteUser } from '../actions/users';
+import { createUser, updateUser, deleteUser, approveUser, rejectUser } from '../actions/users';
 import Modal from '../components/Modal';
 import {
-    ConfirmDelete, ErrorAlert, FormActions, SearchBox, StatCard,
-    inputClass, labelClass, primaryButton, useServerAction,
+    ConfirmAction, ConfirmDelete, ErrorAlert, FormActions, SearchBox, StatCard,
+    inputClass, labelClass, primaryButton, successButton, useServerAction,
 } from '../components/ui';
 
 const ROLE_STYLES = {
@@ -15,19 +15,25 @@ const ROLE_STYLES = {
     ADMIN: { label: 'ผู้บริหาร', badge: 'bg-purple-100 text-purple-800', icon: 'fa-user-shield', avatar: 'bg-purple-100 text-purple-600', card: 'purple' },
 };
 
-const TABS = [{ id: 'ALL', label: 'ผู้ใช้งานทั้งหมด', icon: 'fa-list' }, ...Object.entries(ROLE_STYLES).map(([id, r]) => ({ id, label: r.label, icon: r.icon }))];
+const TABS = [
+    { id: 'ALL', label: 'ผู้ใช้งานทั้งหมด', icon: 'fa-list' },
+    ...Object.entries(ROLE_STYLES).map(([id, r]) => ({ id, label: r.label, icon: r.icon })),
+    { id: 'PENDING', label: 'รอการอนุมัติ', icon: 'fa-user-clock' },
+];
 
 export default function UserList({ users, groups, currentUserId, initialTab, openAddOnLoad }) {
     const [filterRole, setFilterRole] = useState(initialTab);
     const [searchTerm, setSearchTerm] = useState('');
-    // modal: null | { type: 'add' } | { type: 'edit' | 'delete', user }
+    // modal: null | { type: 'add' } | { type: 'edit' | 'delete' | 'approve' | 'reject', user }
     const [modal, setModal] = useState(openAddOnLoad ? { type: 'add', role: initialTab === 'ALL' ? 'STUDENT' : initialTab } : null);
     const closeModal = () => setModal(null);
 
     const filtered = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
         return users.filter(u => {
-            if (filterRole !== 'ALL' && u.role !== filterRole) return false;
+            if (filterRole === 'PENDING') {
+                if (u.status !== 'PENDING') return false;
+            } else if (filterRole !== 'ALL' && u.role !== filterRole) return false;
             if (!term) return true;
             return [u.firstName, u.lastName, u.username, u.email, u.studentId]
                 .some(v => v && v.toLowerCase().includes(term));
@@ -35,6 +41,7 @@ export default function UserList({ users, groups, currentUserId, initialTab, ope
     }, [users, filterRole, searchTerm]);
 
     const countByRole = (role) => users.filter(u => u.role === role).length;
+    const pendingCount = users.filter(u => u.status === 'PENDING').length;
 
     return (
         <>
@@ -57,6 +64,11 @@ export default function UserList({ users, groups, currentUserId, initialTab, ope
                             >
                                 <i className={`fas ${tab.icon} mr-2 ${filterRole === tab.id ? 'text-blue-600' : 'text-gray-400'}`}></i>
                                 {tab.label}
+                                {tab.id === 'PENDING' && pendingCount > 0 && (
+                                    <span className="ml-2 inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">
+                                        {pendingCount}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </nav>
@@ -107,15 +119,25 @@ export default function UserList({ users, groups, currentUserId, initialTab, ope
                                             {user.role === 'STUDENT' ? (user.trainingGroup?.name || <span className="text-gray-400">ยังไม่มีกลุ่ม</span>) : '-'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                {user.status === 'ACTIVE' ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : user.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                                                {user.status === 'ACTIVE' ? 'เปิดใช้งาน' : user.status === 'PENDING' ? 'รอการอนุมัติ' : 'ปิดใช้งาน'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            {user.status === 'PENDING' && (
+                                                <>
+                                                    <button onClick={() => setModal({ type: 'approve', user })} className="text-green-600 hover:text-green-900 mr-3" title="อนุมัติ">
+                                                        <i className="fas fa-check"></i>
+                                                    </button>
+                                                    <button onClick={() => setModal({ type: 'reject', user })} className="text-red-600 hover:text-red-900 mr-3" title="ปฏิเสธ">
+                                                        <i className="fas fa-times"></i>
+                                                    </button>
+                                                </>
+                                            )}
                                             <button onClick={() => setModal({ type: 'edit', user })} className="text-blue-600 hover:text-blue-900 mr-3" title="แก้ไข">
                                                 <i className="fas fa-edit"></i>
                                             </button>
-                                            {user.id !== currentUserId && (
+                                            {user.id !== currentUserId && user.status !== 'PENDING' && (
                                                 <button onClick={() => setModal({ type: 'delete', user })} className="text-red-600 hover:text-red-900" title="ลบ">
                                                     <i className="fas fa-trash-alt"></i>
                                                 </button>
@@ -147,6 +169,30 @@ export default function UserList({ users, groups, currentUserId, initialTab, ope
                 >
                     คุณต้องการลบผู้ใช้งาน <b>{modal.user.firstName} {modal.user.lastName}</b> ใช่หรือไม่? การกระทำนี้ไม่สามารถเรียกคืนได้
                 </ConfirmDelete>
+            )}
+            {modal?.type === 'approve' && (
+                <ConfirmAction
+                    title="ยืนยันการอนุมัติผู้ใช้งาน"
+                    icon="fa-user-check" iconClass="bg-green-100 text-green-600"
+                    confirmLabel="ยืนยันการอนุมัติ" pendingLabel="กำลังอนุมัติ..." buttonClass={successButton}
+                    action={() => approveUser(modal.user.id)}
+                    onDone={closeModal}
+                    onClose={closeModal}
+                >
+                    คุณต้องการอนุมัติ <b>{modal.user.firstName} {modal.user.lastName}</b> ({ROLE_STYLES[modal.user.role].label}) ใช่หรือไม่? ผู้ใช้งานจะสามารถเข้าสู่ระบบได้ทันที
+                </ConfirmAction>
+            )}
+            {modal?.type === 'reject' && (
+                <ConfirmAction
+                    title="ยืนยันการปฏิเสธคำขอสมัครสมาชิก"
+                    icon="fa-user-slash" iconClass="bg-red-100 text-red-600"
+                    confirmLabel="ยืนยันการปฏิเสธ" pendingLabel="กำลังปฏิเสธ..."
+                    action={() => rejectUser(modal.user.id)}
+                    onDone={closeModal}
+                    onClose={closeModal}
+                >
+                    คุณต้องการปฏิเสธคำขอสมัครสมาชิกของ <b>{modal.user.firstName} {modal.user.lastName}</b> ใช่หรือไม่? ข้อมูลที่กรอกไว้จะถูกลบออกจากระบบและไม่สามารถเรียกคืนได้
+                </ConfirmAction>
             )}
         </>
     );
@@ -181,6 +227,7 @@ function UserFormModal({ user, defaultRole = 'STUDENT', isSelf = false, groups, 
                             <div>
                                 <label className={labelClass}>สถานะ</label>
                                 <select name="status" defaultValue={user.status} disabled={isSelf} className={inputClass}>
+                                    <option value="PENDING">รอการอนุมัติ</option>
                                     <option value="ACTIVE">เปิดใช้งาน</option>
                                     <option value="INACTIVE">ปิดใช้งาน</option>
                                 </select>

@@ -8,6 +8,7 @@ export const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5';
 export const primaryButton = 'inline-flex items-center justify-center rounded-lg px-5 py-2.5 bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors';
 export const secondaryButton = 'inline-flex items-center justify-center rounded-lg border border-gray-300 px-5 py-2.5 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-colors';
 export const dangerButton = 'inline-flex items-center justify-center rounded-lg px-5 py-2.5 bg-red-600 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 transition-colors';
+export const successButton = 'inline-flex items-center justify-center rounded-lg px-5 py-2.5 bg-green-600 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60 transition-colors';
 
 // Runs a server action while tracking pending state and the error it returns.
 // Unlike <form action={fn}>, this keeps what the user typed when the action fails.
@@ -52,22 +53,40 @@ export function FormActions({ isPending, submitLabel, onCancel }) {
     );
 }
 
-export function ConfirmDelete({ title, children, action, onDone, onClose }) {
+// Generic "confirm before running this action" dialog. ConfirmDelete below is
+// just the delete-flavored default; pass icon/confirmLabel/buttonClass to reuse
+// the same dialog for other one-click actions (approve, reject, ...).
+export function ConfirmAction({
+    title, children, action, onDone, onClose,
+    icon = 'fa-exclamation-triangle', iconClass = 'bg-red-100 text-red-600',
+    confirmLabel = 'ยืนยัน', pendingLabel = 'กำลังดำเนินการ...', buttonClass = dangerButton,
+}) {
     const { run, isPending, error } = useServerAction();
 
     return (
-        <Modal title={title} icon="fa-exclamation-triangle" iconClass="bg-red-100 text-red-600" size="md" onClose={onClose}>
+        <Modal title={title} icon={icon} iconClass={iconClass} size="md" onClose={onClose}>
             <div className="px-6 pb-4">
                 <ErrorAlert>{error}</ErrorAlert>
                 <div className="text-sm text-gray-600">{children}</div>
             </div>
             <div className="px-6 py-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 border-t border-gray-100 bg-gray-50">
                 <button type="button" onClick={onClose} className={secondaryButton}>ยกเลิก</button>
-                <button type="button" disabled={isPending} onClick={() => run(action, onDone)} className={dangerButton}>
-                    {isPending ? 'กำลังลบ...' : 'ยืนยันการลบ'}
+                <button type="button" disabled={isPending} onClick={() => run(action, onDone)} className={buttonClass}>
+                    {isPending ? pendingLabel : confirmLabel}
                 </button>
             </div>
         </Modal>
+    );
+}
+
+export function ConfirmDelete({ title, children, action, onDone, onClose }) {
+    return (
+        <ConfirmAction
+            title={title} action={action} onDone={onDone} onClose={onClose}
+            confirmLabel="ยืนยันการลบ" pendingLabel="กำลังลบ..."
+        >
+            {children}
+        </ConfirmAction>
     );
 }
 

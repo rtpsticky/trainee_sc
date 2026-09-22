@@ -9,8 +9,8 @@ const sarabun = Sarabun({
 });
 
 export const metadata = {
-  title: "ระบบฝึกงาน สาธารณสุขศาสตร์ มรพส.",
-  description: "ระบบฝึกงาน สาธารณสุขศาสตร์ มหาวิทยาลัยราชภัฏพิบูลสงคราม",
+  title: "ฝึกประสบการณ์วิชาชีพ สาขาวิชาสาธารณสุขศาสตร์",
+  description: "ระบบฝึกประสบการณ์วิชาชีพ สาขาวิชาสาธารณสุขศาสตร์ มหาวิทยาลัยราชภัฏพิบูลสงคราม",
 };
 
 export default function RootLayout({ children }) {
