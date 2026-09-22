@@ -19,7 +19,8 @@ function uniqueError(error) {
 }
 
 // Parses/validates the student-only section of the registration form.
-async function studentFields(formData) {
+// Training group assignment is left to an admin/staff member after approval.
+function studentFields(formData) {
     const studentId = optional(formData, 'studentId')
     if (!studentId) return { error: 'กรุณากรอกรหัสนักศึกษา' }
 
@@ -30,21 +31,7 @@ async function studentFields(formData) {
         if (isNaN(academicYear) || academicYear < 0) return { error: 'รุ่นปีต้องเป็นตัวเลข' }
     }
 
-    let trainingGroupId = null
-    const groupText = text(formData, 'trainingGroupId')
-    if (groupText) {
-        trainingGroupId = parseInt(groupText, 10)
-        if (isNaN(trainingGroupId)) return { error: 'ข้อมูลกลุ่มฝึกงานไม่ถูกต้อง' }
-
-        const group = await prisma.trainingGroup.findUnique({
-            where: { id: trainingGroupId },
-            select: { name: true, capacity: true, isActive: true, _count: { select: { students: true } } },
-        })
-        if (!group || !group.isActive) return { error: 'ไม่พบกลุ่มฝึกงานที่เลือก หรือกลุ่มนี้ปิดรับแล้ว' }
-        if (group._count.students >= group.capacity) return { error: `กลุ่ม "${group.name}" เต็มแล้ว (${group.capacity} คน)` }
-    }
-
-    return { data: { studentId, major: optional(formData, 'major'), academicYear, trainingGroupId } }
+    return { data: { studentId, major: optional(formData, 'major'), academicYear, trainingGroupId: null } }
 }
 
 // Public self-registration for students and advisors (TEACHER). Accounts start
@@ -69,7 +56,7 @@ export async function registerUser(formData) {
 
     let studentData = { studentId: null, major: null, academicYear: null, trainingGroupId: null }
     if (role === 'STUDENT') {
-        const student = await studentFields(formData)
+        const student = studentFields(formData)
         if (student.error) return { error: student.error }
         studentData = student.data
     }

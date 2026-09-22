@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-sarabun), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-prompt), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   color: #171717;
   background: #f3f4f6;
-  font-family: var(--font-sarabun), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-prompt), ui-sans-serif, system-ui, sans-serif;
 }
 
 .card-shadow {

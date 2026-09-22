@@ -31,7 +31,7 @@ export function Brand({ systemName }) {
     return (
         <div className="p-4 flex items-center border-b">
             <div className="w-10 h-10 mr-2 relative flex-shrink-0">
-                <Image src="/logo.jpeg" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" fill sizes="40px" className="object-contain" />
+                <Image src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" fill sizes="40px" className="object-contain" />
             </div>
             <div className="min-w-0">
                 <h1 className="font-bold text-blue-800 text-sm truncate">{systemName}</h1>

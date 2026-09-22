@@ -34,7 +34,7 @@ export default function LandingPage({ settings }) {
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                     <div className="flex items-center min-w-0">
                         <div className="w-10 h-10 relative flex-shrink-0 mr-3">
-                            <Image src="/logo.jpeg" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" fill className="object-contain" />
+                            <Image src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" fill className="object-contain" />
                         </div>
                         <div className="min-w-0">
                             <p className="font-bold text-blue-900 text-sm sm:text-base leading-tight truncate">{settings.SYSTEM_NAME}</p>

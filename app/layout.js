@@ -1,10 +1,10 @@
-import { Sarabun } from "next/font/google";
+import { Prompt } from "next/font/google";
 import "./globals.css";
 
-const sarabun = Sarabun({
+const prompt = Prompt({
   weight: ['300', '400', '500', '600', '700'],
   subsets: ['thai', 'latin'],
-  variable: '--font-sarabun',
+  variable: '--font-prompt',
   display: 'swap',
 });
 
@@ -20,7 +20,7 @@ export default function RootLayout({ children }) {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
       </head>
       <body
-        className={`${sarabun.variable} antialiased font-sans`}
+        className={`${prompt.variable} antialiased font-sans`}
       >
         {children}
       </body>

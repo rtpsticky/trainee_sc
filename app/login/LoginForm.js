@@ -14,7 +14,7 @@ export default function LoginForm({ systemName }) {
                 <div>
                     <div className="mx-auto w-20 h-20 relative">
                         <Image
-                            src="/logo.jpeg"
+                            src="/main-logo.png"
                             alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม"
                             fill
                             className="object-contain"

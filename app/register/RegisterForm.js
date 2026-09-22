@@ -11,7 +11,7 @@ const ROLE_OPTIONS = [
     { value: 'TEACHER', label: 'ที่ปรึกษา (อาจารย์)', icon: 'fa-chalkboard-teacher' },
 ]
 
-export default function RegisterForm({ systemName, groups }) {
+export default function RegisterForm({ systemName }) {
     const [role, setRole] = useState('STUDENT')
     const [submitted, setSubmitted] = useState(false)
     const { run, isPending, error } = useServerAction()
@@ -27,7 +27,7 @@ export default function RegisterForm({ systemName, groups }) {
             <div className="max-w-2xl w-full space-y-6 bg-white p-8 rounded-lg card-shadow">
                 <div>
                     <div className="mx-auto w-16 h-16 relative">
-                        <Image src="/logo.jpeg" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" fill className="object-contain" />
+                        <Image src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" fill className="object-contain" />
                     </div>
                     <h2 className="mt-4 text-center text-2xl font-extrabold text-blue-900">{systemName}</h2>
                     <p className="mt-1 text-center text-sm text-gray-600">สมัครสมาชิกเข้าใช้งานระบบ</p>
@@ -125,20 +125,9 @@ export default function RegisterForm({ systemName, groups }) {
                                         <input type="number" name="academicYear" min="0" className={inputClass} />
                                     </div>
                                 </div>
-                                <div className="mt-4">
-                                    <label className={labelClass}>กลุ่มฝึกงาน</label>
-                                    <select name="trainingGroupId" defaultValue="" className={inputClass}>
-                                        <option value="">-- ยังไม่จัดกลุ่ม / ให้เจ้าหน้าที่จัดให้ --</option>
-                                        {groups.map(g => {
-                                            const full = g._count.students >= g.capacity
-                                            return (
-                                                <option key={g.id} value={g.id} disabled={full}>
-                                                    {g.name} (รุ่น {g.generation}) - {g._count.students}/{g.capacity}{full ? ' เต็ม' : ''}
-                                                </option>
-                                            )
-                                        })}
-                                    </select>
-                                </div>
+                                <p className="text-xs text-gray-400 mt-3">
+                                    <i className="fas fa-circle-info mr-1"></i>เจ้าหน้าที่จะจัดกลุ่มฝึกงานให้หลังจากบัญชีได้รับการอนุมัติ
+                                </p>
                             </div>
                         )}
 
