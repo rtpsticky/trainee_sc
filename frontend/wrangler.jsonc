@@ -3,6 +3,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "trainee-sc",
   "compatibility_date": "2026-11-01",
+  // https://trainee-sc.rtp-goodwork.workers.dev — must be listed in the backend's CORS_ORIGINS.
+  "workers_dev": true,
+  // Preview URLs get their own origin, which the API's CORS would reject anyway.
+  "preview_urls": false,
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
