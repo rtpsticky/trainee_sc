@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# trainee_sc
 
-## Getting Started
+ระบบฝึกประสบการณ์วิชาชีพ สาขาวิชาสาธารณสุขศาสตร์ แยกเป็น 2 ส่วนใน repo เดียว
 
-First, run the development server:
+| โฟลเดอร์ | เทคโนโลยี | Deploy ที่ | URL |
+|---|---|---|---|
+| `backend/` | Next.js (API route handlers เท่านั้น) + Prisma + PostgreSQL | Ubuntu server (PM2 + nginx) | `https://epid-odpc2.ddc.moph.go.th/trainee_sc` (API อยู่ใต้ `/trainee_sc/api`) |
+| `frontend/` | Vite + React + React Router (SPA) | Cloudflare Workers (static assets) | `https://trainee-sc.<subdomain>.workers.dev` หรือโดเมนที่ผูกไว้ |
+
+การยืนยันตัวตนใช้ JWT แบบ Bearer token: `POST /api/auth/login` คืน `token` แล้ว frontend เก็บใน `localStorage`
+และส่งกลับมาใน header `Authorization: Bearer <token>` ทุกครั้ง
+
+## พัฒนาในเครื่อง
 
 ```bash
+# backend -> http://localhost:3001/trainee_sc/api
+cd backend
+cp .env.example .env     # ใส่ DATABASE_URL, SESSION_SECRET, CORS_ORIGINS
+npm install              # รัน prisma generate ให้อัตโนมัติ
+npm run db:migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# frontend -> http://localhost:5173 (อ่าน API จาก frontend/.env.development)
+cd frontend
+npm install
+npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ผู้ใช้ตัวอย่างจาก `npm run db:seed`: `staff01` / `password123`
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Deploy backend (Ubuntu)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+git clone <repo> && cd trainee_sc/backend
+cp .env.example .env     # ตั้ง DATABASE_URL, SESSION_SECRET (สุ่มยาว ๆ), CORS_ORIGINS=<URL ของ frontend>
+npm ci
+npm run db:migrate
+npm run build
+pm2 start ecosystem.config.cjs && pm2 save
+```
 
-## Learn More
+จากนั้นเพิ่ม `backend/deploy/nginx-trainee_sc.conf` ลงใน `server {}` ของ `epid-odpc2.ddc.moph.go.th` แล้ว `sudo nginx -t && sudo systemctl reload nginx`
+ตรวจสอบด้วย `curl https://epid-odpc2.ddc.moph.go.th/trainee_sc/api/health`
 
-To learn more about Next.js, take a look at the following resources:
+อัปเดตเวอร์ชัน: `git pull && npm ci && npm run db:migrate && npm run build && pm2 restart trainee_sc-api`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy frontend (Cloudflare Workers)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cd frontend
+npx wrangler login       # ครั้งแรกครั้งเดียว
+npm run deploy           # vite build (ใช้ .env.production) + wrangler deploy
+```
 
-## Deploy on Vercel
+หรือเชื่อม repo กับ Cloudflare Workers Builds: root directory = `frontend`, build command = `npm run build`, deploy command = `npx wrangler deploy`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+URL ของ API ถูกฝังตอน build จาก `VITE_API_URL` ใน `frontend/.env.production`
+อย่าลืมเพิ่ม URL ของ frontend ลงใน `CORS_ORIGINS` ของ backend ด้วย ไม่อย่างนั้นเบราว์เซอร์จะเรียก API ไม่ได้
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## API
+
+ทุก path อยู่ใต้ `/trainee_sc/api` ตอบกลับเป็น JSON ถ้าผิดพลาดจะได้ `{ "error": "..." }` พร้อมสถานะ 4xx/5xx
+
+| Method | Path | สิทธิ์ |
+|---|---|---|
+| GET | `/health` | สาธารณะ |
+| POST | `/auth/login`, `/auth/register` | สาธารณะ |
+| GET | `/auth/me`, `/dashboard` | ผู้ใช้ที่ล็อกอิน |
+| GET / PUT | `/settings` | GET สาธารณะ, PUT = STAFF/ADMIN |
+| GET | `/reports`, `/students` | TEACHER/STAFF/ADMIN |
+| GET / POST | `/supervisions` · PUT / DELETE `/supervisions/:id` | TEACHER/STAFF/ADMIN |
+| GET / POST | `/users` (`?role=&status=`) · PUT / DELETE `/users/:id` · POST `/users/:id/approve`, `/users/:id/reject` | STAFF/ADMIN |
+| GET / POST | `/groups` · PUT / DELETE `/groups/:id` | STAFF/ADMIN |
+| POST | `/groups/:id/students` (`{ studentIds }`) · DELETE `/groups/:id/students/:studentId` | STAFF/ADMIN |
+| POST | `/groups/:id/mentors` · PUT / DELETE `/mentors/:id` | STAFF/ADMIN |
+| GET / POST | `/locations` · PUT / DELETE `/locations/:id` | STAFF/ADMIN |
+
+## หมายเหตุ (Windows)
+
+backend ใช้ `next dev/build --webpack` เพราะ Turbopack ต้องสร้าง symlink ซึ่ง Windows ไม่อนุญาตถ้าไม่ได้เปิด Developer Mode
