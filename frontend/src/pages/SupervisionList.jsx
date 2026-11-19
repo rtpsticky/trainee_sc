@@ -2,26 +2,35 @@ import { useMemo, useState } from 'react';
 import { createSupervision, updateSupervision, deleteSupervision } from '../lib/api';
 import Modal from '../components/Modal';
 import {
-    ConfirmDelete, ErrorAlert, FormActions, SearchBox, StatCard,
-    inputClass, labelClass, primaryButton, secondaryButton, useServerAction,
+    Badge, Block, EmptyState, ErrorAlert, Field, FilterTabs, FormActions, FormSection, HowTo, PageHeader, SearchBox, Select, StatCard,
+    confirmAndRun, html, inputClass, primaryButton, secondaryButton, useServerAction,
 } from '../components/ui';
 import { SUPERVISION_TYPE_LABELS, formatDate, formatTime, toDateTimeInputValues } from '../lib/format';
 
 const STATUS_STYLES = {
-    PENDING: { label: 'รอดำเนินการ', className: 'bg-yellow-100 text-yellow-800' },
-    COMPLETED: { label: 'เสร็จสิ้น', className: 'bg-green-100 text-green-800' },
-    CANCELLED: { label: 'ยกเลิก', className: 'bg-red-100 text-red-800' },
+    PENDING: { label: 'รอนิเทศ', tone: 'yellow', icon: 'fa-hourglass-half' },
+    COMPLETED: { label: 'นิเทศแล้ว', tone: 'green', icon: 'fa-circle-check' },
+    CANCELLED: { label: 'ยกเลิก', tone: 'gray', icon: 'fa-ban' },
 };
 
 const TYPE_STYLES = {
-    ONSITE: { className: 'bg-blue-100 text-blue-800', icon: 'fa-user-tie' },
-    ONLINE: { className: 'bg-purple-100 text-purple-800', icon: 'fa-video' },
-    PHONE: { className: 'bg-gray-100 text-gray-800', icon: 'fa-phone' },
+    ONSITE: { tone: 'blue', icon: 'fa-user-tie' },
+    ONLINE: { tone: 'purple', icon: 'fa-video' },
+    PHONE: { tone: 'teal', icon: 'fa-phone' },
 };
 
 const RESULT_LABELS = { EXCELLENT: 'ดีเยี่ยม', GOOD: 'ดี', FAIR: 'พอใช้', IMPROVE: 'ต้องปรับปรุง' };
 
-const studentName = (s) => `${s.prefix ?? ''}${s.firstName} ${s.lastName}`;
+const TYPE_OPTIONS = Object.entries(SUPERVISION_TYPE_LABELS).map(([value, label]) => ({ value, label }));
+const STATUS_OPTIONS = Object.entries(STATUS_STYLES).map(([value, s]) => ({ value, label: s.label }));
+const RESULT_OPTIONS = Object.entries(RESULT_LABELS).map(([value, label]) => ({ value, label }));
+const SORT_OPTIONS = [
+    { value: 'DATE_DESC', label: 'วันที่ล่าสุดก่อน' },
+    { value: 'DATE_ASC', label: 'วันที่เก่าสุดก่อน' },
+    { value: 'NAME', label: 'ชื่อนักศึกษา (ก-ฮ)' },
+];
+
+const personName = (s) => `${s.prefix ?? ''}${s.firstName} ${s.lastName}`;
 
 export default function SupervisionList({ supervisions, students, initialStatus }) {
     // modal: null | { type: 'create' } | { type: 'detail', id }
@@ -54,80 +63,83 @@ export default function SupervisionList({ supervisions, students, initialStatus 
 
     return (
         <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <StatCard title="การนิเทศทั้งหมด" value={supervisions.length} icon="fa-calendar-check" color="blue" />
-                <StatCard title="รอดำเนินการ" value={count('PENDING')} icon="fa-clock" color="yellow" />
-                <StatCard title="เสร็จสิ้นแล้ว" value={count('COMPLETED')} icon="fa-check-circle" color="green" />
-                <StatCard title="ยกเลิก" value={count('CANCELLED')} icon="fa-times-circle" color="red" />
+            <PageHeader icon="fa-chalkboard-user" title="นิเทศติดตาม" description="นัดหมายการนิเทศ บันทึกผลการประเมิน และติดตามนักศึกษา">
+                <button onClick={() => setModal({ type: 'create' })} className={`${primaryButton} text-lg`}>
+                    <i className="fas fa-calendar-plus"></i> นัดหมายนิเทศ
+                </button>
+            </PageHeader>
+
+            <HowTo steps={['กด "นัดหมายนิเทศ" เลือกนักศึกษาและวันเวลา', 'หลังนิเทศเสร็จ กด "บันทึกผล" ที่รายการ', 'เลือกสถานะ "นิเทศแล้ว" และผลการประเมิน']} />
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <StatCard title="ทั้งหมด" value={supervisions.length} suffix="ครั้ง" icon="fa-calendar-check" color="blue" />
+                <StatCard title="รอนิเทศ" value={count('PENDING')} suffix="ครั้ง" icon="fa-hourglass-half" color="yellow" />
+                <StatCard title="นิเทศแล้ว" value={count('COMPLETED')} suffix="ครั้ง" icon="fa-circle-check" color="green" />
+                <StatCard title="ยกเลิก" value={count('CANCELLED')} suffix="ครั้ง" icon="fa-ban" color="red" />
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
-                <div className="p-4 border-b flex flex-col lg:flex-row justify-between lg:items-center gap-4">
-                    <button onClick={() => setModal({ type: 'create' })} className={primaryButton}>
-                        <i className="fas fa-plus mr-2"></i> เพิ่มการนิเทศใหม่
-                    </button>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className={inputClass}>
-                            <option value="DATE_DESC">เรียงตามวันที่ (ล่าสุดก่อน)</option>
-                            <option value="DATE_ASC">เรียงตามวันที่ (เก่าสุดก่อน)</option>
-                            <option value="NAME">เรียงตามชื่อนักศึกษา</option>
-                        </select>
-                        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={inputClass}>
-                            <option value="ALL">แสดงทั้งหมด</option>
-                            <option value="PENDING">เฉพาะรอดำเนินการ</option>
-                            <option value="COMPLETED">เฉพาะเสร็จสิ้น</option>
-                            <option value="CANCELLED">เฉพาะที่ยกเลิก</option>
-                        </select>
-                        <SearchBox value={searchText} onChange={setSearchText} placeholder="ค้นหานักศึกษา, สถานที่..." />
+            <Block number={1} title="เลือกสถานะและค้นหา" className="mb-6">
+                <div className="space-y-4">
+                    <FilterTabs
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        options={[
+                            { value: 'ALL', label: 'ทั้งหมด', icon: 'fa-list', count: supervisions.length },
+                            ...Object.entries(STATUS_STYLES).map(([value, s]) => ({ value, label: s.label, icon: s.icon, count: count(value) })),
+                        ]}
+                    />
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <SearchBox value={searchText} onChange={setSearchText} placeholder="ค้นหานักศึกษา, รหัส, สถานที่..." />
+                        <div className="md:w-64">
+                            <Select options={SORT_OPTIONS} value={sortOrder} onChange={setSortOrder} isSearchable={false} aria-label="เรียงลำดับ" />
+                        </div>
                     </div>
                 </div>
+            </Block>
 
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                {['วันที่นิเทศ', 'นักศึกษา', 'สถานที่', 'รูปแบบ', 'ผู้นิเทศ', 'สถานะ'].map(h => (
-                                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                                ))}
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">การดำเนินการ</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {filtered.map(s => (
-                                <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900">{formatDate(s.date)}</div>
-                                        <div className="text-sm text-gray-500">{formatTime(s.date)}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center">
-                                            <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                                <i className="fas fa-user-graduate text-blue-600"></i>
-                                            </div>
-                                            <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900">{studentName(s.student)}</div>
-                                                <div className="text-sm text-gray-500">{s.student.trainingGroup?.name ?? 'ยังไม่มีกลุ่ม'}</div>
-                                            </div>
+            <Block number={2} title={`รายการนิเทศ (${filtered.length} รายการ)`} bodyClassName="">
+                {filtered.length === 0 ? (
+                    <EmptyState icon="fa-calendar-xmark" title="ไม่พบรายการนิเทศ">
+                        {supervisions.length === 0 ? 'กดปุ่ม "นัดหมายนิเทศ" ด้านบนเพื่อเริ่มต้น' : 'ลองเปลี่ยนสถานะหรือคำค้นหา'}
+                    </EmptyState>
+                ) : (
+                    <ul className="divide-y divide-line">
+                        {filtered.map(s => {
+                            const status = STATUS_STYLES[s.status] ?? STATUS_STYLES.PENDING;
+                            const type = TYPE_STYLES[s.type] ?? TYPE_STYLES.ONSITE;
+                            return (
+                                <li key={s.id} className="px-5 sm:px-6 py-5 flex flex-col md:flex-row md:items-center gap-4">
+                                    <div className="w-20 rounded-xl bg-brand-50 text-brand-700 text-center py-2 flex-shrink-0">
+                                        <p className="text-2xl font-semibold leading-none">{new Date(s.date).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric' })}</p>
+                                        <p className="text-sm">{new Date(s.date).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', month: 'short', year: '2-digit' })}</p>
+                                        <p className="text-sm font-medium">{formatTime(s.date).replace(' น.', '')}</p>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-lg font-semibold text-ink">{personName(s.student)}</p>
+                                        <p className="text-base text-muted">
+                                            {s.student.trainingGroup?.name ?? 'ยังไม่มีกลุ่ม'}
+                                            <span className="mx-1.5">·</span><i className="fas fa-location-dot mr-1"></i>{s.locationName || 'ไม่ระบุสถานที่'}
+                                        </p>
+                                        <p className="text-base text-muted">ผู้นิเทศ: {personName(s.supervisor)}</p>
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            <Badge tone={status.tone} icon={status.icon}>{status.label}</Badge>
+                                            <Badge tone={type.tone} icon={type.icon}>{SUPERVISION_TYPE_LABELS[s.type]}</Badge>
+                                            {s.status === 'COMPLETED' && s.result && <Badge tone="green" icon="fa-star">ผล: {RESULT_LABELS[s.result]}</Badge>}
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">{s.locationName || '-'}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap"><TypeBadge type={s.type} /></td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{studentName(s.supervisor)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={s.status} /></td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                                        <button onClick={() => setModal({ type: 'detail', id: s.id })} className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-full w-8 h-8 inline-flex items-center justify-center transition-colors" title={s.status === 'PENDING' ? 'แก้ไข / บันทึกผล' : 'ดูรายละเอียด'}>
-                                            <i className={`fas ${s.status === 'PENDING' ? 'fa-edit' : 'fa-eye'}`}></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {filtered.length === 0 && (
-                                <tr><td colSpan="7" className="px-6 py-10 text-center text-gray-500">ไม่พบข้อมูลการนิเทศ</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setModal({ type: 'detail', id: s.id })}
+                                        className={`btn btn-sm md:flex-shrink-0 ${s.status === 'PENDING' ? 'btn-primary' : 'btn-soft'}`}
+                                    >
+                                        <i className={`fas ${s.status === 'PENDING' ? 'fa-pen-to-square' : 'fa-eye'}`}></i>
+                                        {s.status === 'PENDING' ? 'บันทึกผล / แก้ไข' : 'ดูรายละเอียด'}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </Block>
 
             {modal?.type === 'create' && <CreateModal students={students} onClose={closeModal} />}
             {current && <DetailModal key={current.id} supervision={current} onClose={closeModal} />}
@@ -140,50 +152,50 @@ function CreateModal({ students, onClose }) {
     const [locationName, setLocationName] = useState('');
     const [touchedLocation, setTouchedLocation] = useState(false);
 
+    const studentOptions = students.map(s => ({
+        value: s.id,
+        label: `${personName(s)}${s.studentId ? ` (${s.studentId})` : ''}${s.trainingGroup ? ` · ${s.trainingGroup.name}` : ''}`,
+    }));
+
     // Picking a student pre-fills the meeting place with their training site.
-    const handleStudentChange = (e) => {
-        const student = students.find(s => String(s.id) === e.target.value);
+    const handleStudentChange = (id) => {
+        const student = students.find(s => String(s.id) === String(id));
         if (!touchedLocation) setLocationName(student?.trainingGroup?.location?.name ?? '');
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
-        run(() => createSupervision(formData), onClose);
+        run(() => createSupervision(formData), onClose, 'นัดหมายนิเทศเรียบร้อยแล้ว');
     };
 
     return (
-        <Modal title="เพิ่มการนิเทศใหม่" icon="fa-plus" onClose={onClose}>
+        <Modal title="นัดหมายนิเทศใหม่" subtitle="กรอกข้อมูลตามลำดับ ช่องที่มี * ต้องกรอก" icon="fa-calendar-plus" onClose={onClose}>
             <form onSubmit={handleSubmit}>
-                <div className="px-6 pb-6 space-y-4">
+                <div className="p-5 sm:p-6 space-y-5">
                     <ErrorAlert>{error}</ErrorAlert>
-                    <div>
-                        <label className={labelClass}>นักศึกษา <span className="text-red-500">*</span></label>
-                        <select name="studentId" required onChange={handleStudentChange} className={inputClass}>
-                            <option value="">เลือกนักศึกษา</option>
-                            {students.map(s => (
-                                <option key={s.id} value={s.id}>
-                                    {studentName(s)}{s.studentId ? ` (${s.studentId})` : ''}{s.trainingGroup ? ` - ${s.trainingGroup.name}` : ''}
-                                </option>
-                            ))}
-                        </select>
-                        {students.length === 0 && <p className="text-xs text-red-500 mt-1">ยังไม่มีนักศึกษาในระบบ กรุณาเพิ่มนักศึกษาที่เมนูจัดการผู้ใช้งานก่อน</p>}
-                    </div>
-                    <ScheduleFields />
-                    <div>
-                        <label className={labelClass}>สถานที่นัดหมาย</label>
-                        <input
-                            type="text" name="locationName" value={locationName} placeholder="เช่น โรงพยาบาล..."
-                            onChange={(e) => { setLocationName(e.target.value); setTouchedLocation(true); }}
-                            className={inputClass}
-                        />
-                    </div>
-                    <div>
-                        <label className={labelClass}>หมายเหตุ / เตรียมเอกสาร</label>
-                        <textarea name="note" rows="3" className={inputClass} placeholder="รายละเอียดเพิ่มเติม..."></textarea>
-                    </div>
+                    <FormSection number={1} title="เลือกนักศึกษา">
+                        <Field label="นักศึกษา" required hint={students.length === 0 ? 'ยังไม่มีนักศึกษาในระบบ กรุณาเพิ่มที่เมนูจัดการผู้ใช้งานก่อน' : 'พิมพ์ชื่อหรือรหัสเพื่อค้นหา'}>
+                            <Select name="studentId" required options={studentOptions} onChange={handleStudentChange} placeholder="-- ค้นหาและเลือกนักศึกษา --" />
+                        </Field>
+                    </FormSection>
+                    <FormSection number={2} title="วัน เวลา และรูปแบบ">
+                        <ScheduleFields />
+                    </FormSection>
+                    <FormSection number={3} title="สถานที่และหมายเหตุ">
+                        <Field label="สถานที่นัดหมาย" hint="เติมให้อัตโนมัติจากแหล่งฝึกของนักศึกษา แก้ไขได้">
+                            <input
+                                type="text" name="locationName" value={locationName} placeholder="เช่น โรงพยาบาล..."
+                                onChange={(e) => { setLocationName(e.target.value); setTouchedLocation(true); }}
+                                className={inputClass}
+                            />
+                        </Field>
+                        <Field label="หมายเหตุ / เอกสารที่ต้องเตรียม">
+                            <textarea name="note" rows="3" className={inputClass} placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+                        </Field>
+                    </FormSection>
                 </div>
-                <FormActions isPending={isPending} submitLabel="บันทึกข้อมูล" onCancel={onClose} />
+                <FormActions isPending={isPending} submitLabel="บันทึกนัดหมาย" onCancel={onClose} />
             </form>
         </Modal>
     );
@@ -192,20 +204,15 @@ function CreateModal({ students, onClose }) {
 function ScheduleFields({ defaults }) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-                <label className={labelClass}>วันที่นิเทศ <span className="text-red-500">*</span></label>
+            <Field label="วันที่นิเทศ" required>
                 <input type="date" name="date" required defaultValue={defaults?.date} className={inputClass} />
-            </div>
-            <div>
-                <label className={labelClass}>เวลานิเทศ <span className="text-red-500">*</span></label>
+            </Field>
+            <Field label="เวลา" required>
                 <input type="time" name="time" required defaultValue={defaults?.time} className={inputClass} />
-            </div>
-            <div>
-                <label className={labelClass}>รูปแบบ <span className="text-red-500">*</span></label>
-                <select name="type" required defaultValue={defaults?.type ?? 'ONSITE'} className={inputClass}>
-                    {Object.entries(SUPERVISION_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-            </div>
+            </Field>
+            <Field label="รูปแบบ" required>
+                <Select name="type" required options={TYPE_OPTIONS} defaultValue={defaults?.type ?? 'ONSITE'} isSearchable={false} />
+            </Field>
         </div>
     );
 }
@@ -213,7 +220,6 @@ function ScheduleFields({ defaults }) {
 function DetailModal({ supervision, onClose }) {
     const { run, isPending, error } = useServerAction();
     const [status, setStatus] = useState(supervision.status);
-    const [confirmingDelete, setConfirmingDelete] = useState(false);
     const schedule = { ...toDateTimeInputValues(supervision.date), type: supervision.type };
 
     const handleSubmit = (e) => {
@@ -222,101 +228,80 @@ function DetailModal({ supervision, onClose }) {
         run(() => updateSupervision(formData), onClose);
     };
 
-    if (confirmingDelete) {
-        return (
-            <ConfirmDelete
-                title="ยืนยันการลบข้อมูลการนิเทศ"
-                action={() => deleteSupervision(supervision.id)}
-                onDone={onClose}
-                onClose={() => setConfirmingDelete(false)}
-            >
-                คุณต้องการลบการนิเทศของ <b>{studentName(supervision.student)}</b> ใช่หรือไม่?
-            </ConfirmDelete>
-        );
-    }
+    const handleDelete = async () => {
+        if (await confirmAndRun({
+            title: 'ลบการนิเทศ?',
+            html: html`ลบการนิเทศของ <b>${personName(supervision.student)}</b><br>วันที่ ${formatDate(supervision.date)} ใช่หรือไม่?`,
+            confirmText: 'ลบการนิเทศ',
+            successText: 'ลบการนิเทศเรียบร้อยแล้ว',
+            action: () => deleteSupervision(supervision.id),
+        })) onClose();
+    };
 
     return (
-        <Modal title="รายละเอียดการนิเทศ" icon="fa-chalkboard-teacher" onClose={onClose}>
+        <Modal title="รายละเอียดการนิเทศ" subtitle={`${personName(supervision.student)} · ${formatDate(supervision.date)}`} icon="fa-chalkboard-user" onClose={onClose}>
             <form onSubmit={handleSubmit}>
                 <input type="hidden" name="id" value={supervision.id} />
-                <div className="px-6 pb-6 space-y-4">
+                <div className="p-5 sm:p-6 space-y-5">
                     <ErrorAlert>{error}</ErrorAlert>
 
-                    <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="rounded-2xl bg-brand-50 p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <p className="text-xs text-gray-500 font-semibold">นักศึกษา</p>
-                            <p className="font-medium text-gray-900">{studentName(supervision.student)}</p>
-                            <p className="text-sm text-gray-500">{supervision.student.trainingGroup?.name ?? 'ยังไม่มีกลุ่ม'}</p>
+                            <p className="text-sm text-muted">นักศึกษา</p>
+                            <p className="text-lg font-medium text-ink">{personName(supervision.student)}</p>
+                            <p className="text-base text-muted">{supervision.student.trainingGroup?.name ?? 'ยังไม่มีกลุ่ม'}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 font-semibold">ผู้นิเทศ</p>
-                            <p className="font-medium text-gray-900">{studentName(supervision.supervisor)}</p>
-                            {supervision.status === 'COMPLETED' && supervision.result && (
-                                <p className="text-sm text-green-600">ผลประเมิน: {RESULT_LABELS[supervision.result]}</p>
-                            )}
+                            <p className="text-sm text-muted">ผู้นิเทศ</p>
+                            <p className="text-lg font-medium text-ink">{personName(supervision.supervisor)}</p>
                         </div>
                     </div>
 
-                    <ScheduleFields defaults={schedule} />
-                    <div>
-                        <label className={labelClass}>สถานที่นัดหมาย</label>
-                        <input type="text" name="locationName" defaultValue={supervision.locationName ?? ''} className={inputClass} />
-                    </div>
-                    <div>
-                        <label className={labelClass}>หมายเหตุ / เตรียมเอกสาร</label>
-                        <textarea name="note" rows="2" defaultValue={supervision.note ?? ''} className={inputClass}></textarea>
-                    </div>
+                    <FormSection number={1} title="นัดหมาย">
+                        <ScheduleFields defaults={schedule} />
+                        <Field label="สถานที่นัดหมาย">
+                            <input type="text" name="locationName" defaultValue={supervision.locationName ?? ''} className={inputClass} />
+                        </Field>
+                        <Field label="หมายเหตุ / เอกสารที่ต้องเตรียม">
+                            <textarea name="note" rows="2" defaultValue={supervision.note ?? ''} className={inputClass}></textarea>
+                        </Field>
+                    </FormSection>
 
-                    <div className="border-t border-gray-100 pt-4">
-                        <label className={labelClass}>สถานะการนิเทศ</label>
-                        <select name="status" value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
-                            {Object.entries(STATUS_STYLES).map(([value, s]) => <option key={value} value={value}>{s.label}</option>)}
-                        </select>
-                    </div>
-
-                    {status === 'COMPLETED' && (
-                        <div className="space-y-4 bg-green-50/50 border border-green-100 rounded-lg p-4">
-                            <h4 className="font-semibold text-gray-900">บันทึกผลการนิเทศ</h4>
-                            <div>
-                                <label className={labelClass}>ผลการประเมิน <span className="text-red-500">*</span></label>
-                                <select name="result" required defaultValue={supervision.result ?? ''} className={inputClass}>
-                                    <option value="">เลือกผลการประเมิน...</option>
-                                    {Object.entries(RESULT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    )}
-                    <div>
-                        <label className={labelClass}>ความคิดเห็น / ข้อเสนอแนะ</label>
-                        <textarea name="comment" rows="3" defaultValue={supervision.comment ?? ''} className={inputClass}></textarea>
-                    </div>
+                    <FormSection number={2} title="บันทึกผลการนิเทศ">
+                        <Field label="สถานะ" hint='เลือก "นิเทศแล้ว" เมื่อนิเทศเสร็จ เพื่อบันทึกผลการประเมิน'>
+                            <Select name="status" options={STATUS_OPTIONS} value={status} onChange={setStatus} isSearchable={false} />
+                        </Field>
+                        {status === 'COMPLETED' && (
+                            <Field label="ผลการประเมิน" required>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {RESULT_OPTIONS.map(r => (
+                                        <label key={r.value} className="cursor-pointer">
+                                            <input type="radio" name="result" value={r.value} required defaultChecked={supervision.result === r.value} className="peer sr-only" />
+                                            <span className="block text-center rounded-xl border-2 border-gray-300 px-3 py-3 text-base font-medium text-ink peer-checked:border-green-600 peer-checked:bg-green-50 peer-checked:text-green-800 peer-focus-visible:ring-4 peer-focus-visible:ring-green-100">
+                                                {r.label}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </Field>
+                        )}
+                        <Field label="ความคิดเห็น / ข้อเสนอแนะ">
+                            <textarea name="comment" rows="3" defaultValue={supervision.comment ?? ''} className={inputClass}></textarea>
+                        </Field>
+                    </FormSection>
                 </div>
-                <div className="px-6 py-4 flex flex-col-reverse sm:flex-row sm:justify-between gap-3 border-t border-gray-100 bg-gray-50">
-                    <button type="button" onClick={() => setConfirmingDelete(true)} className="text-sm text-red-600 hover:text-red-800 px-2 py-2">
-                        <i className="fas fa-trash-alt mr-2"></i>ลบการนิเทศนี้
+                <div className="px-5 sm:px-6 py-4 flex flex-col-reverse sm:flex-row sm:justify-between gap-3 border-t border-line bg-gray-50">
+                    <button type="button" onClick={handleDelete} className="btn btn-soft-danger">
+                        <i className="fas fa-trash"></i> ลบการนิเทศนี้
                     </button>
                     <div className="flex flex-col-reverse sm:flex-row gap-3">
                         <button type="button" onClick={onClose} className={secondaryButton}>ปิด</button>
                         <button type="submit" disabled={isPending} className={primaryButton}>
-                            {isPending ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
+                            {isPending ? <><i className="fas fa-spinner fa-spin"></i> กำลังบันทึก...</> : <><i className="fas fa-save"></i> บันทึก</>}
                         </button>
                     </div>
                 </div>
             </form>
         </Modal>
-    );
-}
-
-function StatusBadge({ status }) {
-    const s = STATUS_STYLES[status] ?? STATUS_STYLES.PENDING;
-    return <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${s.className}`}>{s.label}</span>;
-}
-
-function TypeBadge({ type }) {
-    const t = TYPE_STYLES[type] ?? TYPE_STYLES.ONSITE;
-    return (
-        <span className={`px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full ${t.className}`}>
-            <i className={`fas ${t.icon} mr-1`}></i> {SUPERVISION_TYPE_LABELS[type]}
-        </span>
     );
 }

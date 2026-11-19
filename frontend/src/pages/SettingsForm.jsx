@@ -1,13 +1,13 @@
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { updateSettings } from '../lib/api';
-import { primaryButton, inputClass, labelClass } from '../components/ui';
+import { Block, ErrorAlert, Field, PageHeader, inputClass, notifySuccess, primaryButton } from '../components/ui';
 
-const GROUP_TITLES = {
-    GENERAL: 'ตั้งค่าทั่วไป',
-    ACADEMIC: 'ตั้งค่าปีการศึกษา',
-    CONTACT: 'ข้อมูลติดต่อ',
-    OTHER: 'อื่นๆ',
-};
+const GROUPS = [
+    { key: 'GENERAL', title: 'ข้อมูลทั่วไป', description: 'ชื่อที่แสดงในทุกหน้าของระบบ' },
+    { key: 'ACADEMIC', title: 'ปีการศึกษา', description: 'ใช้แสดงภาคการศึกษาปัจจุบันที่หน้าหลัก' },
+    { key: 'CONTACT', title: 'ข้อมูลติดต่อ', description: 'แสดงที่หน้าแรกเพื่อให้ผู้ใช้ติดต่อได้' },
+    { key: 'OTHER', title: 'อื่น ๆ' },
+];
 
 const INPUT_PROPS = {
     ACADEMIC_YEAR: { inputMode: 'numeric', pattern: '\\d{4}', maxLength: 4 },
@@ -15,58 +15,59 @@ const INPUT_PROPS = {
     CONTACT_EMAIL: { type: 'email' },
 };
 
+const HINTS = {
+    ACADEMIC_YEAR: 'ตัวเลข พ.ศ. 4 หลัก เช่น 2569',
+    SEMESTER: 'กรอก 1, 2 หรือ 3',
+};
+
 export default function SettingsForm({ settings }) {
     const [state, action, isPending] = useActionState((_prevState, formData) => updateSettings(formData), undefined);
 
-    const groups = settings.reduce((acc, item) => {
+    useEffect(() => {
+        if (state?.success) notifySuccess('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+    }, [state]);
+
+    const byGroup = settings.reduce((acc, item) => {
         (acc[item.group || 'OTHER'] ??= []).push(item);
         return acc;
     }, {});
+    const sections = GROUPS.filter(g => byGroup[g.key]);
 
     return (
-        <form action={action} className="space-y-6">
-            {state?.error && (
-                <div className="bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700" role="alert">
-                    <i className="fas fa-exclamation-circle mr-2"></i>{state.error}
-                </div>
-            )}
-            {state?.success && (
-                <div className="bg-green-50 border-l-4 border-green-500 p-4 text-sm text-green-700" role="status">
-                    <i className="fas fa-check-circle mr-2"></i>บันทึกการตั้งค่าเรียบร้อยแล้ว
-                </div>
-            )}
+        <div className="max-w-4xl mx-auto">
+            <PageHeader icon="fa-gear" title="ตั้งค่าระบบ" description="แก้ไขข้อมูลพื้นฐานของระบบ แล้วกดบันทึกที่ด้านล่าง" />
 
-            {Object.entries(groups).map(([groupKey, items]) => (
-                <div key={groupKey} className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                        <h3 className="text-lg font-medium text-gray-900">{GROUP_TITLES[groupKey] || groupKey}</h3>
-                    </div>
-                    <div className="p-6 space-y-4">
-                        {items.map(setting => (
-                            <div key={setting.key}>
-                                <label htmlFor={setting.key} className={labelClass}>{setting.description || setting.key}</label>
-                                {/* key on savedAt re-syncs the field with the value that was just saved */}
-                                <input
-                                    key={`${setting.key}-${state?.savedAt ?? 0}`}
-                                    type="text"
-                                    name={setting.key}
-                                    id={setting.key}
-                                    required
-                                    defaultValue={state?.values?.[setting.key] ?? setting.value}
-                                    className={inputClass}
-                                    {...INPUT_PROPS[setting.key]}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
+            <form action={action} className="space-y-6">
+                <ErrorAlert>{state?.error}</ErrorAlert>
 
-            <div className="flex justify-end">
-                <button type="submit" disabled={isPending} className={primaryButton}>
-                    <i className="fas fa-save mr-2"></i> {isPending ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}
-                </button>
-            </div>
-        </form>
+                {sections.map((group, index) => (
+                    <Block key={group.key} number={index + 1} title={group.title} description={group.description}>
+                        <div className="space-y-5">
+                            {byGroup[group.key].map(setting => (
+                                <Field key={setting.key} label={setting.description || setting.key} hint={HINTS[setting.key]}>
+                                    {/* key on savedAt re-syncs the field with the value that was just saved */}
+                                    <input
+                                        key={`${setting.key}-${state?.savedAt ?? 0}`}
+                                        type="text"
+                                        name={setting.key}
+                                        required
+                                        defaultValue={state?.values?.[setting.key] ?? setting.value}
+                                        className={inputClass}
+                                        {...INPUT_PROPS[setting.key]}
+                                    />
+                                </Field>
+                            ))}
+                        </div>
+                    </Block>
+                ))}
+
+                <div className="block-card p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <p className="text-base text-muted"><i className="fas fa-circle-info mr-2"></i>ตรวจสอบข้อมูลทุกข้อให้ถูกต้องก่อนบันทึก</p>
+                    <button type="submit" disabled={isPending} className={`${primaryButton} text-lg px-8`}>
+                        {isPending ? <><i className="fas fa-spinner fa-spin"></i> กำลังบันทึก...</> : <><i className="fas fa-save"></i> บันทึกการตั้งค่า</>}
+                    </button>
+                </div>
+            </form>
+        </div>
     );
 }

@@ -4,16 +4,17 @@ const MANAGERS = ['STAFF', 'ADMIN'];
 const SUPERVISORS = ['TEACHER', 'STAFF', 'ADMIN'];
 
 const MAIN_MENU = [
-    { href: '/', label: 'หน้าหลัก', icon: 'fa-home' },
-    { href: '/supervisions', label: 'นิเทศติดตาม', icon: 'fa-chalkboard-teacher', roles: SUPERVISORS },
-    { href: '/reports', label: 'รายงาน', icon: 'fa-file-alt', roles: SUPERVISORS },
+    { href: '/', label: 'หน้าหลัก', icon: 'fa-house' },
+    { href: '/calendar', label: 'ปฏิทินฝึกงาน', icon: 'fa-calendar-days' },
+    { href: '/supervisions', label: 'นิเทศติดตาม', icon: 'fa-chalkboard-user', roles: SUPERVISORS },
+    { href: '/reports', label: 'รายงานสรุปผล', icon: 'fa-chart-column', roles: SUPERVISORS },
 ];
 
 const SYSTEM_MENU = [
-    { href: '/users', label: 'จัดการผู้ใช้งาน', icon: 'fa-users-cog', roles: MANAGERS },
-    { href: '/groups', label: 'จัดการกลุ่มฝึกงาน', icon: 'fa-users', roles: MANAGERS },
-    { href: '/locations', label: 'สถานที่ฝึกงาน', icon: 'fa-building', roles: MANAGERS },
-    { href: '/settings', label: 'ตั้งค่าระบบ', icon: 'fa-cog', roles: MANAGERS },
+    { href: '/users', label: 'จัดการผู้ใช้งาน', icon: 'fa-users-gear', roles: MANAGERS },
+    { href: '/groups', label: 'กลุ่มฝึกงาน', icon: 'fa-people-group', roles: MANAGERS },
+    { href: '/locations', label: 'แหล่งฝึกงาน', icon: 'fa-hospital', roles: MANAGERS },
+    { href: '/settings', label: 'ตั้งค่าระบบ', icon: 'fa-gear', roles: MANAGERS },
 ];
 
 export function getNavSections(role) {

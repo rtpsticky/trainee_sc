@@ -2,272 +2,224 @@ import { Link } from 'react-router';
 import AppShell from '../components/AppShell';
 import LandingPage from './LandingPage';
 import { LoadState } from './pages';
+import { Block, StatCard, StepFlow, EmptyState } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { useApiData } from '../lib/useApi';
 import { SUPERVISION_TYPE_LABELS, formatDate, formatDay, formatTime, formatTimeAgo } from '../lib/format';
+
+const TZ = 'Asia/Bangkok';
 
 export default function Dashboard() {
   const { user, settings } = useAuth();
 
   if (!user) return <LandingPage settings={settings} />;
 
-  const semesterLabel = `ภาคการศึกษา ${settings.SEMESTER}/${settings.ACADEMIC_YEAR}`;
+  const semesterLabel = settings.SEMESTER && settings.ACADEMIC_YEAR
+    ? `ภาคการศึกษา ${settings.SEMESTER}/${settings.ACADEMIC_YEAR}`
+    : '';
 
   return (
-    <AppShell title="หน้าหลัก" icon="fa-home">
-      {user.role === 'STUDENT'
-        ? <StudentHome user={user} semesterLabel={semesterLabel} />
-        : <StaffHome user={user} semesterLabel={semesterLabel} />}
+    <AppShell title="หน้าหลัก" icon="fa-house">
+      <Welcome user={user} semesterLabel={semesterLabel} />
+      {user.role === 'STUDENT' ? <StudentHome user={user} /> : <StaffHome user={user} />}
     </AppShell>
   );
 }
 
-function StaffHome({ user, semesterLabel }) {
-  const { data, error, loading } = useApiData({ home: '/dashboard' });
-  if (!data) return <LoadState loading={loading} error={error} />;
-
-  const { stats: statsData, activities, upcoming: upcomingSupervisions } = data.home;
-  const canManage = ['STAFF', 'ADMIN'].includes(user.role);
-  const { counts, supervision } = statsData.error ? { counts: {}, supervision: {} } : statsData;
-
+function Welcome({ user, semesterLabel }) {
+  const today = new Date().toLocaleDateString('th-TH', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   return (
-    <>
-          {/* Welcome Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">
-                  สวัสดี, {user.firstName} {user.lastName} 👋
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  ยินดีต้อนรับสู่ระบบจัดการฝึกงานสาขาสาธารณสุขศาสตร์
-                </p>
-              </div>
-              <div className="mt-4 md:mt-0">
-                <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full border border-blue-100">
-                  {semesterLabel}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard
-              title="นักศึกษาทั้งหมด"
-              value={counts?.students || 0}
-              icon="fa-user-graduate"
-              color="blue"
-              link={canManage ? '/users?tab=STUDENT' : null}
-            />
-            <StatCard
-              title="สถานที่ฝึกงาน"
-              value={counts?.locations || 0}
-              icon="fa-hospital"
-              color="purple"
-              link={canManage ? '/locations' : null}
-            />
-            <StatCard
-              title="กลุ่มฝึกงาน"
-              value={counts?.groups || 0}
-              icon="fa-users"
-              color="green"
-              link={canManage ? '/groups' : null}
-            />
-            <StatCard
-              title="รอการนิเทศ"
-              value={supervision?.pending || 0}
-              icon="fa-clock"
-              color="yellow"
-              link="/supervisions?status=PENDING"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column: Activities & Quick Actions */}
-            <div className="lg:col-span-2 space-y-8">
-
-              {/* Quick Actions */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                  <i className="fas fa-bolt mr-2 text-yellow-500"></i> ทางลัดการทำงาน
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {canManage && <QuickAction title="เพิ่มนักศึกษา" icon="fa-user-plus" color="blue" href="/users?tab=STUDENT&new=1" />}
-                  {canManage && <QuickAction title="จัดกลุ่มฝึกงาน" icon="fa-users" color="purple" href="/groups" />}
-                  <QuickAction title="นัดหมายนิเทศ" icon="fa-calendar-plus" color="green" href="/supervisions" />
-                  <QuickAction title="ดูรายงาน" icon="fa-file-alt" color="indigo" href="/reports" />
-                </div>
-              </div>
-
-              {/* Recent Activities */}
-              {canManage && <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-                  <h3 className="text-lg font-bold text-gray-800 flex items-center">
-                    <i className="fas fa-history mr-2 text-gray-400"></i> กิจกรรมล่าสุด
-                  </h3>
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {activities.length > 0 ? activities.map((activ, idx) => (
-                    <div key={idx} className="p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activ.color}`}>
-                          <i className={`fas ${activ.icon}`}></i>
-                        </div>
-                        <div className="ml-4 flex-1">
-                          <p className="text-sm font-medium text-gray-900">{activ.title}</p>
-                          <p className="text-sm text-gray-500 line-clamp-1">{activ.desc}</p>
-                          <p className="text-xs text-gray-400 mt-1">{formatTimeAgo(activ.date)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="p-8 text-center text-gray-400 text-sm">ยังไม่มีกิจกรรมล่าสุด</div>
-                  )}
-                </div>
-              </div>}
-
-            </div>
-
-            {/* Right Column: Upcoming & Calendar */}
-            <div className="space-y-8">
-              {/* Upcoming Supervisions */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-50">
-                  <h3 className="text-lg font-bold text-gray-800 flex items-center">
-                    <i className="fas fa-calendar-alt mr-2 text-blue-500"></i> การนิเทศเร็วๆ นี้
-                  </h3>
-                </div>
-                <div className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
-                  {upcomingSupervisions.length > 0 ? upcomingSupervisions.map((sup) => (
-                    <div key={sup.id} className="p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start mb-2">
-                        <div className="flex-col flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg p-2 min-w-[50px] mr-3">
-                          <span className="text-xl font-bold leading-none">{new Date(sup.date).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric' })}</span>
-                          <span className="text-[10px] uppercase font-bold">{new Date(sup.date).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', month: 'short' })}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-gray-800 line-clamp-1">{sup.student.firstName} {sup.student.lastName}</p>
-                          <p className="text-xs text-gray-500">{formatTime(sup.date)} • {SUPERVISION_TYPE_LABELS[sup.type]}</p>
-                        </div>
-                      </div>
-                      <div className="ml-[62px]">
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600">
-                          {sup.locationName || 'ไม่ระบุสถานที่'}
-                        </span>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="p-8 text-center text-gray-400 text-sm">ไม่มีการนัดหมายเร็วๆ นี้</div>
-                  )}
-                </div>
-                <div className="p-3 bg-gray-50 text-center border-t border-gray-100">
-                  <Link to="/supervisions" className="text-xs font-semibold text-blue-600 hover:text-blue-800">ดูทั้งหมด</Link>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-    </>
+    <div className="block-card p-6 sm:p-8 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <p className="text-base text-muted mb-1">{today}</p>
+        <h1 className="text-2xl sm:text-3xl font-semibold text-ink">
+          สวัสดี คุณ{user.firstName} {user.lastName}
+        </h1>
+        <p className="text-lg text-muted mt-1">ยินดีต้อนรับสู่ระบบฝึกประสบการณ์วิชาชีพ</p>
+      </div>
+      {semesterLabel && (
+        <span className="self-start md:self-center inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-50 text-brand-700 text-lg font-medium">
+          <i className="fas fa-graduation-cap"></i>{semesterLabel}
+        </span>
+      )}
+    </div>
   );
 }
 
-// Components
-function Wrapper({ href, className, children }) {
-  return href ? <Link to={href} className={className}>{children}</Link> : <div className={className}>{children}</div>;
+function StaffHome({ user }) {
+  const { data, error, loading } = useApiData({ home: '/dashboard' });
+  if (!data) return <LoadState loading={loading} error={error} />;
+
+  const { stats, activities, upcoming } = data.home;
+  const canManage = ['STAFF', 'ADMIN'].includes(user.role);
+  const { counts = {}, supervision = {} } = stats.error ? {} : stats;
+
+  const steps = canManage ? [
+    { title: 'เพิ่มแหล่งฝึกงาน', description: 'โรงพยาบาล / หน่วยงานที่รับนักศึกษา', href: '/locations', count: counts.locations ?? 0 },
+    { title: 'สร้างกลุ่มฝึกงาน', description: 'กำหนดช่วงเวลาและอาจารย์ที่ปรึกษา', href: '/groups', count: counts.groups ?? 0 },
+    { title: 'จัดนักศึกษาเข้ากลุ่ม', description: 'อนุมัติผู้สมัครและจัดเข้ากลุ่ม', href: '/users?tab=STUDENT', count: counts.students ?? 0 },
+    { title: 'นัดหมายนิเทศ', description: 'การนิเทศที่รอดำเนินการ', href: '/supervisions?status=PENDING', count: supervision.pending ?? 0 },
+    { title: 'สรุปผลและรายงาน', description: 'การนิเทศที่เสร็จสิ้นแล้ว', href: '/reports', count: supervision.completed ?? 0 },
+  ] : [
+    { title: 'ดูปฏิทินฝึกงาน', description: 'ดูวันนัดนิเทศทั้งหมดในปฏิทิน', href: '/calendar', icon: 'fa-calendar-days' },
+    { title: 'นัดหมายนิเทศ', description: 'การนิเทศที่รอดำเนินการ', href: '/supervisions?status=PENDING', count: supervision.pending ?? 0 },
+    { title: 'บันทึกผลการนิเทศ', description: 'การนิเทศที่บันทึกผลแล้ว', href: '/supervisions?status=COMPLETED', count: supervision.completed ?? 0 },
+    { title: 'ดูรายงานสรุปผล', description: 'ภาพรวมผลการประเมิน', href: '/reports', icon: 'fa-chart-column' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <Block number={1} title="ขั้นตอนการทำงาน" description="เริ่มจากขั้นตอนที่ 1 ไปตามลำดับ กดที่กล่องเพื่อไปยังหน้านั้น">
+        <StepFlow steps={steps} />
+      </Block>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard title="นักศึกษา" value={counts.students ?? 0} suffix="คน" icon="fa-user-graduate" color="blue" href={canManage ? '/users?tab=STUDENT' : undefined} />
+        <StatCard title="อาจารย์" value={counts.teachers ?? 0} suffix="คน" icon="fa-chalkboard-user" color="green" href={canManage ? '/users?tab=TEACHER' : undefined} />
+        <StatCard title="แหล่งฝึกงาน" value={counts.locations ?? 0} suffix="แห่ง" icon="fa-hospital" color="purple" href={canManage ? '/locations' : undefined} />
+        <StatCard title="รอการนิเทศ" value={supervision.pending ?? 0} suffix="รายการ" icon="fa-clock" color="yellow" href="/supervisions?status=PENDING" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <Block
+          number={2}
+          title="การนิเทศที่กำลังจะมาถึง"
+          className={canManage ? 'lg:col-span-3' : 'lg:col-span-5'}
+          bodyClassName=""
+          actions={<Link to="/calendar" className="btn btn-soft btn-sm"><i className="fas fa-calendar-days"></i> ดูปฏิทิน</Link>}
+        >
+          <UpcomingList items={upcoming} showStudent />
+        </Block>
+
+        {canManage && (
+          <Block number={3} title="กิจกรรมล่าสุด" className="lg:col-span-2" bodyClassName="">
+            {activities.length > 0 ? (
+              <ul className="divide-y divide-line">
+                {activities.map((a, idx) => (
+                  <li key={idx} className="px-5 sm:px-6 py-4 flex items-start gap-4">
+                    <span className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${a.color}`}>
+                      <i className={`fas ${a.icon}`}></i>
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-base font-medium text-ink">{a.title}</p>
+                      <p className="text-base text-muted line-clamp-2">{a.desc}</p>
+                      <p className="text-sm text-muted mt-0.5">{formatTimeAgo(a.date)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : <EmptyState icon="fa-clock-rotate-left" title="ยังไม่มีกิจกรรม" />}
+          </Block>
+        )}
+      </div>
+    </div>
+  );
 }
 
-function StudentHome({ user, semesterLabel }) {
+function UpcomingList({ items, showStudent }) {
+  if (items.length === 0) {
+    return <EmptyState icon="fa-calendar-check" title="ยังไม่มีการนัดหมาย">การนัดหมายนิเทศที่กำลังจะมาถึงจะแสดงที่นี่</EmptyState>;
+  }
+  return (
+    <ul className="divide-y divide-line">
+      {items.map(sup => (
+        <li key={sup.id} className="px-5 sm:px-6 py-4 flex items-center gap-4">
+          <div className="w-16 rounded-xl bg-brand-50 text-brand-700 text-center py-2 flex-shrink-0">
+            <p className="text-2xl font-semibold leading-none">{new Date(sup.date).toLocaleDateString('th-TH', { timeZone: TZ, day: 'numeric' })}</p>
+            <p className="text-sm">{new Date(sup.date).toLocaleDateString('th-TH', { timeZone: TZ, month: 'short' })}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-lg font-medium text-ink truncate">
+              {showStudent ? `${sup.student.firstName} ${sup.student.lastName}` : SUPERVISION_TYPE_LABELS[sup.type]}
+            </p>
+            <p className="text-base text-muted">
+              <i className="far fa-clock mr-1"></i>{formatTime(sup.date)}
+              {showStudent && <> · {SUPERVISION_TYPE_LABELS[sup.type]}</>}
+              {!showStudent && <> · ผู้นิเทศ {sup.supervisor.firstName} {sup.supervisor.lastName}</>}
+            </p>
+            <p className="text-base text-muted truncate"><i className="fas fa-location-dot mr-1"></i>{sup.locationName || 'ไม่ระบุสถานที่'}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function StudentHome({ user }) {
   const { data, error, loading } = useApiData({ home: '/dashboard' });
   if (!data) return <LoadState loading={loading} error={error} />;
 
   const { group, upcoming } = data.home;
+  const now = Date.now();
+  const started = group && new Date(group.startDate).getTime() <= now;
+  const finished = group && new Date(group.endDate).getTime() < now;
+
+  const steps = [
+    { title: 'สมัครสมาชิก', description: 'ส่งใบสมัครเรียบร้อย', state: 'done' },
+    { title: 'ได้รับการอนุมัติ', description: 'บัญชีพร้อมใช้งาน', state: 'done' },
+    { title: 'จัดเข้ากลุ่มฝึกงาน', description: group ? group.name : 'รอเจ้าหน้าที่จัดกลุ่ม', state: group ? 'done' : 'active' },
+    {
+      title: 'ออกฝึกงาน',
+      description: !group ? 'รอจัดกลุ่มก่อน' : finished ? 'ฝึกงานครบแล้ว' : started ? 'กำลังฝึกงาน' : `เริ่ม ${formatDay(group.startDate)}`,
+      state: !group ? 'todo' : finished ? 'done' : 'active',
+    },
+    {
+      title: 'รับการนิเทศ',
+      description: upcoming.length > 0 ? `มีนัดหมาย ${upcoming.length} ครั้ง` : 'ยังไม่มีนัดหมาย',
+      state: group ? 'active' : 'todo',
+      href: '/calendar',
+      cta: 'ดูปฏิทิน',
+    },
+  ];
 
   return (
-    <>
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-xl font-bold text-gray-800">สวัสดี, {user.firstName} {user.lastName} 👋</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {semesterLabel}{user.studentId ? ` · รหัสนักศึกษา ${user.studentId}` : ''}
-          </p>
-        </div>
+    <div className="space-y-6">
+      <Block number={1} title="สถานะการฝึกงานของฉัน" description={user.studentId ? `รหัสนักศึกษา ${user.studentId}` : undefined}>
+        <StepFlow steps={steps} />
+      </Block>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4"><i className="fas fa-users mr-2 text-green-600"></i>กลุ่มฝึกงานของฉัน</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Block number={2} title="กลุ่มฝึกงานของฉัน">
           {group ? (
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div><dt className="text-gray-500">กลุ่ม</dt><dd className="font-medium text-gray-900">{group.name} (รุ่น {group.generation})</dd></div>
-              <div><dt className="text-gray-500">สถานที่ฝึกงาน</dt><dd className="font-medium text-gray-900">{group.location.name}</dd></div>
-              <div><dt className="text-gray-500">ระยะเวลา</dt><dd className="font-medium text-gray-900">{formatDay(group.startDate)} - {formatDay(group.endDate)}</dd></div>
-              <div>
-                <dt className="text-gray-500">อาจารย์ที่ปรึกษา</dt>
-                <dd className="font-medium text-gray-900">
-                  {group.advisors.length > 0 ? group.advisors.map(a => `${a.prefix ?? ''}${a.firstName} ${a.lastName}`).join(', ') : 'ยังไม่ระบุ'}
-                </dd>
-              </div>
+            <dl className="space-y-4">
+              <InfoRow icon="fa-people-group" label="กลุ่ม" value={`${group.name} (รุ่น ${group.generation})`} />
+              <InfoRow icon="fa-hospital" label="แหล่งฝึกงาน" value={`${group.location.name} จ.${group.location.province}`} />
+              <InfoRow icon="fa-calendar-days" label="ระยะเวลาฝึกงาน" value={`${formatDay(group.startDate)} ถึง ${formatDay(group.endDate)}`} />
+              <InfoRow
+                icon="fa-chalkboard-user"
+                label="อาจารย์ที่ปรึกษา"
+                value={group.advisors.length > 0 ? group.advisors.map(a => `${a.prefix ?? ''}${a.firstName} ${a.lastName}`).join(', ') : 'ยังไม่ระบุ'}
+              />
             </dl>
           ) : (
-            <p className="text-sm text-gray-500">คุณยังไม่ได้ถูกจัดเข้ากลุ่มฝึกงาน กรุณาติดต่อเจ้าหน้าที่</p>
+            <EmptyState icon="fa-hourglass-half" title="ยังไม่ได้ถูกจัดเข้ากลุ่ม">เจ้าหน้าที่จะจัดกลุ่มฝึกงานให้ หากมีข้อสงสัยกรุณาติดต่อเจ้าหน้าที่</EmptyState>
           )}
-        </div>
+        </Block>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4"><i className="fas fa-calendar-alt mr-2 text-blue-500"></i>การนิเทศที่กำลังจะมาถึง</h3>
-          {upcoming.length > 0 ? (
-            <ul className="divide-y divide-gray-100">
-              {upcoming.map(sup => (
-                <li key={sup.id} className="py-3 text-sm">
-                  <p className="font-medium text-gray-900">{formatDate(sup.date)} {formatTime(sup.date)}</p>
-                  <p className="text-gray-500">{SUPERVISION_TYPE_LABELS[sup.type]} · {sup.locationName || 'ไม่ระบุสถานที่'} · ผู้นิเทศ {sup.supervisor.firstName} {sup.supervisor.lastName}</p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-gray-500">ยังไม่มีการนัดหมายนิเทศ</p>
-          )}
-        </div>
+        <Block
+          number={3}
+          title="การนิเทศที่กำลังจะมาถึง"
+          bodyClassName=""
+          actions={<Link to="/calendar" className="btn btn-soft btn-sm"><i className="fas fa-calendar-days"></i> ดูปฏิทิน</Link>}
+        >
+          <UpcomingList items={upcoming} />
+        </Block>
       </div>
-    </>
+      <p className="text-base text-muted text-center">ข้อมูล ณ {formatDate(new Date())}</p>
+    </div>
   );
 }
 
-function StatCard({ title, value, icon, color, link }) {
-  const colors = {
-    blue: 'bg-blue-50 text-blue-600',
-    purple: 'bg-purple-50 text-purple-600',
-    green: 'bg-green-50 text-green-600',
-    yellow: 'bg-yellow-50 text-yellow-600',
-  };
-
+function InfoRow({ icon, label, value }) {
   return (
-    <Wrapper href={link} className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center ${link ? 'hover:shadow-md transition-shadow cursor-pointer' : ''}`}>
-      <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${colors[color]}`}>
-        <i className={`fas ${icon} text-xl`}></i>
-      </div>
-      <div>
-        <p className="text-sm font-medium text-gray-500">{title}</p>
-        <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
-      </div>
-    </Wrapper>
-  );
-}
-
-function QuickAction({ title, icon, color, href }) {
-  const colors = {
-    blue: 'hover:bg-blue-50 hover:border-blue-200 text-blue-600',
-    purple: 'hover:bg-purple-50 hover:border-purple-200 text-purple-600',
-    green: 'hover:bg-green-50 hover:border-green-200 text-green-600',
-    indigo: 'hover:bg-indigo-50 hover:border-indigo-200 text-indigo-600',
-  };
-
-  return (
-    <Link to={href} className={`flex flex-col items-center justify-center p-4 border border-gray-100 rounded-xl transition-all ${colors[color]} group`}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 bg-gray-50 group-hover:bg-white`}>
+    <div className="flex items-start gap-4">
+      <span className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
         <i className={`fas ${icon}`}></i>
+      </span>
+      <div className="min-w-0">
+        <dt className="text-base text-muted">{label}</dt>
+        <dd className="text-lg font-medium text-ink">{value}</dd>
       </div>
-      <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900">{title}</span>
-    </Link>
+    </div>
   );
 }

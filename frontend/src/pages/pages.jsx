@@ -13,13 +13,22 @@ import UserList from './UserList'
 export function LoadState({ loading, error }) {
     if (error) {
         return (
-            <div className="px-4 py-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded-r" role="alert">
-                <i className="fas fa-exclamation-circle mr-2"></i>{error}
+            <div className="block-card p-6 flex items-start gap-4 text-red-800 bg-red-50 border-red-200" role="alert">
+                <i className="fas fa-triangle-exclamation text-2xl mt-0.5"></i>
+                <div>
+                    <p className="text-lg font-medium">ไม่สามารถโหลดข้อมูลได้</p>
+                    <p className="text-base">{error}</p>
+                </div>
             </div>
         )
     }
     if (loading) {
-        return <div className="p-12 text-center text-gray-400"><i className="fas fa-spinner fa-spin text-2xl"></i></div>
+        return (
+            <div className="block-card p-12 text-center text-muted">
+                <i className="fas fa-spinner fa-spin text-3xl text-brand-600"></i>
+                <p className="text-lg mt-3">กำลังโหลดข้อมูล...</p>
+            </div>
+        )
     }
     return null
 }
@@ -34,7 +43,7 @@ export function GroupsPage() {
     })
 
     return (
-        <AppShell title="จัดการกลุ่มฝึกงาน" icon="fa-users">
+        <AppShell title="กลุ่มฝึกงาน" icon="fa-people-group">
             {data ? (
                 <GroupList
                     groups={data.groups.groups}
@@ -51,7 +60,7 @@ export function LocationsPage() {
     const { data, error, loading } = useApiData({ locations: '/locations' })
 
     return (
-        <AppShell title="จัดการแหล่งฝึกงาน" icon="fa-building">
+        <AppShell title="แหล่งฝึกงาน" icon="fa-hospital">
             {data ? <LocationList locations={data.locations.locations} /> : <LoadState loading={loading} error={error} />}
         </AppShell>
     )
@@ -64,7 +73,7 @@ export function UsersPage() {
     const { data, error, loading } = useApiData({ users: '/users', groups: '/groups' })
 
     return (
-        <AppShell title="จัดการผู้ใช้งาน" icon="fa-users-cog">
+        <AppShell title="จัดการผู้ใช้งาน" icon="fa-users-gear">
             {data ? (
                 <UserList
                     users={data.users.users}
@@ -84,20 +93,14 @@ export function SupervisionsPage() {
     const { data, error, loading } = useApiData({ supervisions: '/supervisions', students: '/students' })
 
     return (
-        <AppShell title="นิเทศติดตาม" icon="fa-chalkboard-teacher">
-            <div className="max-w-7xl mx-auto">
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900">นิเทศติดตามการฝึกงาน</h1>
-                    <p className="text-sm text-gray-500 mt-1">จัดการข้อมูลการนิเทศ ประเมินผล และติดตามนักศึกษา</p>
-                </div>
-                {data ? (
-                    <SupervisionList
-                        supervisions={data.supervisions.supervisions}
-                        students={data.students.students}
-                        initialStatus={['PENDING', 'COMPLETED', 'CANCELLED'].includes(status) ? status : 'ALL'}
-                    />
-                ) : <LoadState loading={loading} error={error} />}
-            </div>
+        <AppShell title="นิเทศติดตาม" icon="fa-chalkboard-user">
+            {data ? (
+                <SupervisionList
+                    supervisions={data.supervisions.supervisions}
+                    students={data.students.students}
+                    initialStatus={['PENDING', 'COMPLETED', 'CANCELLED'].includes(status) ? status : 'ALL'}
+                />
+            ) : <LoadState loading={loading} error={error} />}
         </AppShell>
     )
 }
@@ -106,10 +109,8 @@ export function ReportsPage() {
     const { data, error, loading } = useApiData({ stats: '/reports' })
 
     return (
-        <AppShell title="รายงานสรุปผล" icon="fa-file-alt">
-            <div className="max-w-7xl mx-auto w-full">
-                {data ? <ReportDashboard data={data.stats} /> : <LoadState loading={loading} error={error} />}
-            </div>
+        <AppShell title="รายงานสรุปผล" icon="fa-chart-column">
+            {data ? <ReportDashboard data={data.stats} /> : <LoadState loading={loading} error={error} />}
         </AppShell>
     )
 }
@@ -118,14 +119,8 @@ export function SettingsPage() {
     const { settingRows } = useAuth()
 
     return (
-        <AppShell title="ตั้งค่าระบบ" icon="fa-cog">
-            <div className="max-w-4xl mx-auto">
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900">ตั้งค่าระบบ</h1>
-                    <p className="text-sm text-gray-500 mt-1">จัดการข้อมูลพื้นฐานและค่าเริ่มต้นของระบบ</p>
-                </div>
-                <SettingsForm settings={settingRows} />
-            </div>
+        <AppShell title="ตั้งค่าระบบ" icon="fa-gear">
+            <SettingsForm settings={settingRows} />
         </AppShell>
     )
 }

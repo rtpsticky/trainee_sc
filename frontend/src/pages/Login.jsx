@@ -1,91 +1,120 @@
-import { useActionState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { login } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { ErrorAlert, notifySuccess } from '../components/ui'
+
+const HELP_STEPS = [
+    'กรอกชื่อผู้ใช้ที่ได้ตั้งไว้ตอนสมัครสมาชิก',
+    'กรอกรหัสผ่าน (กดรูปตาเพื่อดูรหัสที่พิมพ์)',
+    'กดปุ่ม "เข้าสู่ระบบ"',
+]
 
 export default function LoginForm() {
     const { settings, signIn } = useAuth()
     const systemName = settings.SYSTEM_NAME
     const navigate = useNavigate()
+    const [showPassword, setShowPassword] = useState(false)
+
+    useEffect(() => { document.title = `เข้าสู่ระบบ | ${systemName}` }, [systemName])
 
     const [state, action, isPending] = useActionState(async (_prevState, formData) => {
         const username = String(formData.get('username') || '').trim()
         const result = await login(formData)
         if (result.error) return { message: result.error, username }
         signIn(result.token, result.user)
+        notifySuccess(`ยินดีต้อนรับ คุณ${result.user.firstName}`)
         navigate('/', { replace: true })
     }, undefined)
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-            <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg card-shadow">
-                <div>
-                    <div className="mx-auto w-20 h-20 relative">
-                        <img src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" className="absolute inset-0 w-full h-full object-contain" />
+        <div className="min-h-screen bg-page flex items-center justify-center p-4 sm:p-8">
+            <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 rounded-3xl overflow-hidden block-card">
+                {/* Info panel */}
+                <div className="bg-gradient-to-br from-brand-800 to-brand-600 text-white p-8 sm:p-10 flex flex-col">
+                    <Link to="/" className="inline-flex items-center gap-2 text-blue-100 hover:text-white text-base mb-8">
+                        <i className="fas fa-arrow-left"></i> กลับหน้าแรก
+                    </Link>
+                    <img src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" className="w-20 h-20 object-contain bg-white rounded-2xl p-2 mb-6" />
+                    <h1 className="text-2xl sm:text-3xl font-bold leading-snug mb-2">{systemName}</h1>
+                    <p className="text-lg text-blue-100 font-light mb-8">สาขาวิชาสาธารณสุขศาสตร์ มหาวิทยาลัยราชภัฏพิบูลสงคราม</p>
+
+                    <div className="mt-auto rounded-2xl bg-white/10 p-5">
+                        <p className="text-lg font-medium mb-4">วิธีเข้าสู่ระบบ</p>
+                        <ol className="space-y-3">
+                            {HELP_STEPS.map((s, i) => (
+                                <li key={s} className="flex items-start gap-3">
+                                    <span className="w-8 h-8 rounded-full bg-white text-brand-700 font-semibold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                                    <span className="text-base text-blue-50 pt-0.5">{s}</span>
+                                </li>
+                            ))}
+                        </ol>
                     </div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-blue-900">
-                        {systemName}
-                    </h2>
-                    <p className="mt-2 text-center text-sm text-gray-600">
-                        สาขาสาธารณสุขศาสตร์ มหาวิทยาลัยราชภัฏพิบูลสงคราม
-                    </p>
                 </div>
-                <form className="mt-8 space-y-6" action={action}>
-                    <div className="rounded-md shadow-sm -space-y-px">
+
+                {/* Form */}
+                <div className="bg-white p-8 sm:p-10">
+                    <h2 className="text-3xl font-semibold text-ink mb-1">เข้าสู่ระบบ</h2>
+                    <p className="text-lg text-muted mb-8">กรอกชื่อผู้ใช้และรหัสผ่านของท่าน</p>
+
+                    <form action={action} className="space-y-6">
+                        <ErrorAlert>{state?.message}</ErrorAlert>
+
                         <div>
-                            <label htmlFor="username" className="sr-only">
+                            <label htmlFor="username" className="field-label text-lg">
+                                <span className="inline-flex w-7 h-7 rounded-full bg-brand-50 text-brand-700 text-base items-center justify-center mr-2">1</span>
                                 ชื่อผู้ใช้
                             </label>
-                            <input
-                                id="username"
-                                name="username"
-                                defaultValue={state?.username}
-                                autoComplete="username"
-                                type="text"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                                placeholder="ชื่อผู้ใช้"
-                            />
+                            <div className="relative">
+                                <i className="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input
+                                    id="username" name="username" type="text" required autoFocus
+                                    autoComplete="username" defaultValue={state?.username}
+                                    placeholder="เช่น std66001"
+                                    className="field-input pl-11 py-4 text-lg"
+                                />
+                            </div>
                         </div>
+
                         <div>
-                            <label htmlFor="password" className="sr-only">
+                            <label htmlFor="password" className="field-label text-lg">
+                                <span className="inline-flex w-7 h-7 rounded-full bg-brand-50 text-brand-700 text-base items-center justify-center mr-2">2</span>
                                 รหัสผ่าน
                             </label>
-                            <input
-                                id="password"
-                                name="password"
-                                autoComplete="current-password"
-                                type="password"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                                placeholder="รหัสผ่าน"
-                            />
+                            <div className="relative">
+                                <i className="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input
+                                    id="password" name="password" required
+                                    type={showPassword ? 'text' : 'password'}
+                                    autoComplete="current-password"
+                                    placeholder="รหัสผ่าน"
+                                    className="field-input pl-11 pr-14 py-4 text-lg"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(v => !v)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-lg text-gray-500 hover:bg-gray-100"
+                                    aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                                >
+                                    <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    {state?.message && (
-                        <div className="text-red-500 text-sm text-center">
-                            {state.message}
-                        </div>
-                    )}
-
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={isPending}
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                        >
-                            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                                <i className="fas fa-lock group-hover:text-blue-200 text-blue-500 transition ease-in-out duration-150"></i>
-                            </span>
-                            {isPending ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+                        <button type="submit" disabled={isPending} className="btn btn-primary w-full text-lg py-4">
+                            {isPending
+                                ? <><i className="fas fa-spinner fa-spin"></i> กำลังเข้าสู่ระบบ...</>
+                                : <><span className="inline-flex w-7 h-7 rounded-full bg-white/20 text-base items-center justify-center">3</span> เข้าสู่ระบบ</>}
                         </button>
-                    </div>
+                    </form>
 
-                    <p className="text-center text-sm text-gray-600">
-                        ยังไม่มีบัญชี? <Link to="/register" className="font-medium text-blue-600 hover:text-blue-800">สมัครสมาชิก</Link>
-                    </p>
-                </form>
+                    <div className="mt-8 pt-6 border-t border-line text-center">
+                        <p className="text-base text-muted mb-3">ยังไม่มีบัญชีผู้ใช้?</p>
+                        <Link to="/register" className="btn btn-secondary w-full text-lg">
+                            <i className="fas fa-user-plus text-brand-600"></i> สมัครสมาชิกใหม่
+                        </Link>
+                    </div>
+                </div>
             </div>
         </div>
     )

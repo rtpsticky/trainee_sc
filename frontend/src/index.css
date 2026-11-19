@@ -1,15 +1,115 @@
 @import "tailwindcss";
 
+/* Classes sent by the API (dashboard activity colors), so Tailwind generates them. */
+@source inline("bg-blue-100 text-blue-600 bg-green-100 text-green-600 bg-purple-100 text-purple-600");
+
 @theme {
-  --font-sans: 'Prompt', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Kanit', ui-sans-serif, system-ui, sans-serif;
+
+  /* Very light gray page, white blocks, one strong blue for actions. */
+  --color-page: #f4f5f7;
+  --color-line: #e3e6eb;
+  --color-ink: #1f2937;
+  --color-muted: #4b5563;
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe7ff;
+  --color-brand-600: #1d4ed8;
+  --color-brand-700: #1e40af;
+  --color-brand-800: #1e3a8a;
+  --color-brand-900: #172554;
+}
+
+/* Slightly larger base size: every rem-based size grows with it, which helps older readers. */
+html {
+  font-size: 17px;
 }
 
 body {
-  color: #171717;
-  background: #f3f4f6;
-  font-family: 'Prompt', ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-page);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
-.card-shadow {
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+/* Clear focus ring for keyboard users. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+@layer components {
+  .block-card {
+    @apply bg-white rounded-2xl border border-line shadow-[0_1px_2px_rgba(16,24,40,0.04)];
+  }
+
+  .field-input {
+    @apply w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-ink placeholder:text-gray-400
+      transition-colors focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-100
+      disabled:bg-gray-100 disabled:text-gray-500;
+  }
+
+  .field-label {
+    @apply mb-2 block text-base font-medium text-ink;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-medium
+      transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  /* Always used together with .btn, e.g. "btn btn-primary". */
+  .btn-primary { @apply bg-brand-600 text-white hover:bg-brand-700; }
+  .btn-secondary { @apply border border-gray-300 bg-white text-ink hover:bg-gray-50; }
+  .btn-danger { @apply bg-red-600 text-white hover:bg-red-700; }
+  .btn-success { @apply bg-green-600 text-white hover:bg-green-700; }
+  .btn-soft { @apply bg-brand-50 text-brand-700 hover:bg-brand-100; }
+  .btn-soft-danger { @apply bg-red-50 text-red-700 hover:bg-red-100; }
+  .btn-sm { @apply px-3.5 py-2 text-[0.95rem] rounded-lg; }
+}
+
+/* ---------- SweetAlert2: match the app's font and sizes ---------- */
+.swal2-popup {
+  font-family: var(--font-sans) !important;
+  border-radius: 1.25rem !important;
+  padding: 1.75rem 1.5rem 1.5rem !important;
+}
+.swal2-title { font-size: 1.5rem !important; font-weight: 600 !important; color: var(--color-ink) !important; }
+.swal2-html-container { font-size: 1.05rem !important; color: var(--color-muted) !important; line-height: 1.7 !important; }
+.swal2-actions { gap: 0.75rem; }
+.swal2-styled { font-family: var(--font-sans) !important; font-size: 1rem !important; border-radius: 0.75rem !important; padding: 0.7rem 1.5rem !important; margin: 0 !important; }
+.swal2-validation-message { font-size: 1rem !important; }
+.swal2-toast { padding: 0.9rem 1.1rem !important; }
+.swal2-toast .swal2-title { font-size: 1.05rem !important; }
+
+/* ---------- FullCalendar ---------- */
+.calendar-wrap .fc {
+  --fc-border-color: var(--color-line);
+  --fc-today-bg-color: #fff7d6;
+  --fc-button-bg-color: #ffffff;
+  --fc-button-border-color: #d1d5db;
+  --fc-button-text-color: var(--color-ink);
+  --fc-button-hover-bg-color: #f3f4f6;
+  --fc-button-hover-border-color: #d1d5db;
+  --fc-button-active-bg-color: var(--color-brand-600);
+  --fc-button-active-border-color: var(--color-brand-600);
+  --fc-event-border-color: transparent;
+  font-size: 1rem;
+}
+.calendar-wrap .fc .fc-toolbar-title { font-size: 1.5rem; font-weight: 600; }
+.calendar-wrap .fc .fc-button { font-family: var(--font-sans); font-size: 1rem; padding: 0.5rem 0.9rem; border-radius: 0.75rem; box-shadow: none !important; }
+.calendar-wrap .fc .fc-button-active { color: #fff; }
+.calendar-wrap .fc .fc-col-header-cell-cushion { padding: 0.6rem 0; font-weight: 600; color: var(--color-muted); }
+.calendar-wrap .fc .fc-daygrid-day-number { font-size: 1rem; font-weight: 500; color: var(--color-ink); padding: 0.4rem 0.6rem; }
+.calendar-wrap .fc .fc-daygrid-event { border-radius: 0.5rem; padding: 2px 6px; font-size: 0.9rem; cursor: pointer; }
+.calendar-wrap .fc .fc-list-event { cursor: pointer; }
+.calendar-wrap .fc .fc-list-day-cushion { background: #f8fafc; }
+.calendar-wrap .fc a { color: inherit; text-decoration: none; }
+@media (max-width: 640px) {
+  .calendar-wrap .fc .fc-toolbar { flex-direction: column; gap: 0.75rem; }
+  .calendar-wrap .fc .fc-toolbar-title { font-size: 1.25rem; }
+}
+
+@media print {
+  body { background: #fff; }
+  .block-card { box-shadow: none; }
 }
