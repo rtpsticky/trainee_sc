@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { registerUser } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { LOGO_ALT, ORG } from '../lib/org'
 import { ErrorAlert, Field, inputClass, primaryButton, secondaryButton, useServerAction } from '../components/ui'
 
 const ROLE_OPTIONS = [
@@ -67,8 +68,11 @@ export default function RegisterForm() {
             <div className="max-w-3xl mx-auto">
                 <div className="flex items-center justify-between gap-3 mb-6">
                     <Link to="/" className="flex items-center gap-3 min-w-0">
-                        <img src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" className="w-12 h-12 object-contain flex-shrink-0" />
-                        <span className="font-semibold text-brand-800 text-lg leading-tight truncate">{systemName}</span>
+                        <img src="/main-logo.png" alt={LOGO_ALT} className="w-12 h-12 object-contain flex-shrink-0" />
+                        <span className="min-w-0">
+                            <span className="block font-semibold text-brand-800 text-lg leading-tight truncate">{systemName}</span>
+                            <span className="block text-sm text-muted truncate">{ORG.program} {ORG.faculty}</span>
+                        </span>
                     </Link>
                     <Link to="/login" className="btn btn-secondary btn-sm flex-shrink-0">มีบัญชีแล้ว? เข้าสู่ระบบ</Link>
                 </div>

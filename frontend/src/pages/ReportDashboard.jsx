@@ -1,4 +1,5 @@
 import { Block, EmptyState, PageHeader, StatCard } from '../components/ui';
+import { ORG } from '../lib/org';
 
 const RESULTS = [
     { key: 'EXCELLENT', label: 'ดีเยี่ยม', color: 'bg-green-600' },
@@ -30,7 +31,8 @@ export default function ReportDashboard({ data }) {
             {/* Header for print */}
             <div className="hidden print:block mb-8 text-center">
                 <h1 className="text-2xl font-bold">รายงานสรุปผลการฝึกประสบการณ์วิชาชีพ</h1>
-                <p className="text-base">สาขาวิชาสาธารณสุขศาสตร์ มหาวิทยาลัยราชภัฏพิบูลสงคราม</p>
+                <p className="text-base">{ORG.program} {ORG.faculty}</p>
+                <p className="text-base">{ORG.university}</p>
                 <p className="text-sm mt-1">ข้อมูล ณ วันที่ {printedAt}</p>
             </div>
 

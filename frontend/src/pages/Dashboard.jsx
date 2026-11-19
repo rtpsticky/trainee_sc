@@ -55,15 +55,15 @@ function StaffHome({ user }) {
   const { counts = {}, supervision = {} } = stats.error ? {} : stats;
 
   const steps = canManage ? [
-    { title: 'เพิ่มแหล่งฝึกงาน', description: 'โรงพยาบาล / หน่วยงานที่รับนักศึกษา', href: '/locations', count: counts.locations ?? 0 },
-    { title: 'สร้างกลุ่มฝึกงาน', description: 'กำหนดช่วงเวลาและอาจารย์ที่ปรึกษา', href: '/groups', count: counts.groups ?? 0 },
-    { title: 'จัดนักศึกษาเข้ากลุ่ม', description: 'อนุมัติผู้สมัครและจัดเข้ากลุ่ม', href: '/users?tab=STUDENT', count: counts.students ?? 0 },
-    { title: 'นัดหมายนิเทศ', description: 'การนิเทศที่รอดำเนินการ', href: '/supervisions?status=PENDING', count: supervision.pending ?? 0 },
-    { title: 'สรุปผลและรายงาน', description: 'การนิเทศที่เสร็จสิ้นแล้ว', href: '/reports', count: supervision.completed ?? 0 },
+    { title: 'เพิ่มแหล่งฝึกงาน', description: 'โรงพยาบาล / หน่วยงานที่รับนักศึกษา', href: '/locations', icon: 'fa-hospital' },
+    { title: 'สร้างกลุ่มฝึกงาน', description: 'กำหนดช่วงเวลาและอาจารย์ที่ปรึกษา', href: '/groups', icon: 'fa-people-group' },
+    { title: 'จัดนักศึกษาเข้ากลุ่ม', description: 'อนุมัติผู้สมัครและจัดเข้ากลุ่ม', href: '/users?tab=STUDENT', icon: 'fa-user-check' },
+    { title: 'นัดหมายนิเทศ', description: 'นัดวันและเวลานิเทศนักศึกษา', href: '/supervisions?status=PENDING', icon: 'fa-calendar-plus' },
+    { title: 'สรุปผลและรายงาน', description: 'ดูผลการประเมินและพิมพ์รายงาน', href: '/reports', icon: 'fa-chart-column' },
   ] : [
     { title: 'ดูปฏิทินฝึกงาน', description: 'ดูวันนัดนิเทศทั้งหมดในปฏิทิน', href: '/calendar', icon: 'fa-calendar-days' },
-    { title: 'นัดหมายนิเทศ', description: 'การนิเทศที่รอดำเนินการ', href: '/supervisions?status=PENDING', count: supervision.pending ?? 0 },
-    { title: 'บันทึกผลการนิเทศ', description: 'การนิเทศที่บันทึกผลแล้ว', href: '/supervisions?status=COMPLETED', count: supervision.completed ?? 0 },
+    { title: 'นัดหมายนิเทศ', description: 'นัดวันและเวลานิเทศนักศึกษา', href: '/supervisions?status=PENDING', icon: 'fa-calendar-plus' },
+    { title: 'บันทึกผลการนิเทศ', description: 'บันทึกผลหลังนิเทศเสร็จ', href: '/supervisions?status=COMPLETED', icon: 'fa-clipboard-check' },
     { title: 'ดูรายงานสรุปผล', description: 'ภาพรวมผลการประเมิน', href: '/reports', icon: 'fa-chart-column' },
   ];
 

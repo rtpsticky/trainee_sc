@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { login } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { ErrorAlert, notifySuccess } from '../components/ui'
+import { LOGO_ALT, ORG } from '../lib/org'
 
 const HELP_STEPS = [
     'กรอกชื่อผู้ใช้ที่ได้ตั้งไว้ตอนสมัครสมาชิก',
@@ -35,9 +36,12 @@ export default function LoginForm() {
                     <Link to="/" className="inline-flex items-center gap-2 text-blue-100 hover:text-white text-base mb-8">
                         <i className="fas fa-arrow-left"></i> กลับหน้าแรก
                     </Link>
-                    <img src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" className="w-20 h-20 object-contain bg-white rounded-2xl p-2 mb-6" />
+                    <img src="/main-logo.png" alt={LOGO_ALT} className="w-20 h-20 object-contain bg-white rounded-2xl p-2 mb-6" />
                     <h1 className="text-2xl sm:text-3xl font-bold leading-snug mb-2">{systemName}</h1>
-                    <p className="text-lg text-blue-100 font-light mb-8">สาขาวิชาสาธารณสุขศาสตร์ มหาวิทยาลัยราชภัฏพิบูลสงคราม</p>
+                    <div className="text-lg text-blue-100 font-light mb-8 leading-relaxed">
+                        <p className="font-normal text-white">{ORG.program}</p>
+                        <p>{ORG.faculty} {ORG.university}</p>
+                    </div>
 
                     <div className="mt-auto rounded-2xl bg-white/10 p-5">
                         <p className="text-lg font-medium mb-4">วิธีเข้าสู่ระบบ</p>

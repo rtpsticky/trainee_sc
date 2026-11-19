@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router';
+import { LOGO_ALT, ORG } from '../lib/org';
 
 export function NavLinks({ sections, onNavigate }) {
     const { pathname } = useLocation();
@@ -30,10 +31,10 @@ export function NavLinks({ sections, onNavigate }) {
 export function Brand({ systemName }) {
     return (
         <Link to="/" className="px-5 py-5 flex items-center gap-3 border-b border-line">
-            <img src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" className="w-12 h-12 object-contain flex-shrink-0" />
+            <img src="/main-logo.png" alt={LOGO_ALT} className="w-12 h-12 object-contain flex-shrink-0" />
             <div className="min-w-0">
                 <p className="font-semibold text-brand-800 leading-snug line-clamp-2">{systemName}</p>
-                <p className="text-sm text-muted">สาขาวิชาสาธารณสุขศาสตร์</p>
+                <p className="text-sm text-muted">{ORG.program}</p>
             </div>
         </Link>
     );
@@ -46,7 +47,10 @@ export default function Sidebar({ sections, systemName }) {
             <nav className="p-4 overflow-y-auto flex-1" aria-label="เมนูหลัก">
                 <NavLinks sections={sections} />
             </nav>
-            <p className="px-5 py-4 border-t border-line text-sm text-muted">มหาวิทยาลัยราชภัฏพิบูลสงคราม</p>
+            <div className="px-5 py-4 border-t border-line text-sm text-muted leading-relaxed">
+                <p>{ORG.faculty}</p>
+                <p>{ORG.university}</p>
+            </div>
         </aside>
     );
 }

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router';
+import { LOGO_ALT, ORG } from '../lib/org';
 
 const STEPS = [
     { icon: 'fa-user-plus', title: 'สมัครสมาชิก', desc: 'กรอกข้อมูลส่วนตัวและตั้งรหัสผ่าน ใช้เวลาประมาณ 3 นาที' },
@@ -26,10 +27,10 @@ export default function LandingPage({ settings }) {
             <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-line">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
                     <Link to="/" className="flex items-center gap-3 min-w-0">
-                        <img src="/main-logo.png" alt="มหาวิทยาลัยราชภัฏพิบูลสงคราม" className="w-12 h-12 object-contain flex-shrink-0" />
+                        <img src="/main-logo.png" alt={LOGO_ALT} className="w-12 h-12 object-contain flex-shrink-0" />
                         <div className="min-w-0">
                             <p className="font-semibold text-brand-800 text-base sm:text-lg leading-tight truncate">{settings.SYSTEM_NAME}</p>
-                            <p className="text-sm text-muted hidden sm:block">มหาวิทยาลัยราชภัฏพิบูลสงคราม</p>
+                            <p className="text-sm text-muted hidden sm:block truncate">{ORG.program} {ORG.faculty}</p>
                         </div>
                     </Link>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -46,11 +47,12 @@ export default function LandingPage({ settings }) {
                     <div className="absolute right-24 -bottom-24 w-64 h-64 rounded-full bg-white/5"></div>
                     <div className="relative max-w-3xl">
                         <span className="inline-block px-4 py-1.5 rounded-full bg-white/15 text-base mb-5">
-                            สาขาวิชาสาธารณสุขศาสตร์ · คณะวิทยาศาสตร์และเทคโนโลยี
+                            {ORG.program} · {ORG.faculty}
                         </span>
                         <h1 className="text-3xl sm:text-5xl font-bold leading-tight mb-5">{settings.SYSTEM_NAME}</h1>
                         <p className="text-lg sm:text-xl text-blue-100 font-light mb-8">
-                            ระบบกลางสำหรับการฝึกประสบการณ์วิชาชีพ ตั้งแต่สมัครสมาชิก จัดกลุ่มฝึกงาน นิเทศติดตาม จนถึงรายงานผล
+                            ระบบกลางสำหรับการฝึกประสบการณ์วิชาชีพของนักศึกษา{ORG.program} {ORG.faculty} {ORG.university}{' '}
+                            ตั้งแต่สมัครสมาชิก จัดกลุ่มฝึกงาน นิเทศติดตาม จนถึงรายงานผล
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3">
                             <Link to="/register" className="btn bg-white text-brand-800 hover:bg-blue-50 text-lg px-8 py-4 shadow-lg">
@@ -107,6 +109,41 @@ export default function LandingPage({ settings }) {
                     </div>
                 </section>
 
+                {/* About the program */}
+                <section className="block-card p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
+                    <div className="lg:col-span-2 flex justify-center">
+                        <img src="/main-logo.png" alt={LOGO_ALT} className="w-56 h-56 sm:w-64 sm:h-64 object-contain" />
+                    </div>
+                    <div className="lg:col-span-3">
+                        <p className="text-base font-medium text-brand-600 mb-1">เกี่ยวกับเรา</p>
+                        <h2 className="text-2xl sm:text-3xl font-semibold text-ink mb-4 leading-snug">
+                            ระบบนี้เป็นของ<br />
+                            <span className="text-brand-700 lg:whitespace-nowrap">{ORG.program}</span>
+                        </h2>
+                        <p className="text-lg text-muted mb-6">
+                            พัฒนาขึ้นเพื่อใช้บริหารจัดการการฝึกประสบการณ์วิชาชีพของนักศึกษาในหลักสูตร
+                            ให้นักศึกษา อาจารย์ที่ปรึกษา เจ้าหน้าที่ และแหล่งฝึก ทำงานร่วมกันได้สะดวกในที่เดียว
+                        </p>
+                        <dl className="space-y-3">
+                            {[
+                                { icon: 'fa-book-open', label: 'หลักสูตร', value: ORG.program },
+                                { icon: 'fa-flask', label: 'คณะ', value: ORG.faculty },
+                                { icon: 'fa-building-columns', label: 'มหาวิทยาลัย', value: ORG.university },
+                            ].map(row => (
+                                <div key={row.label} className="flex items-center gap-4 rounded-2xl bg-page px-4 py-3">
+                                    <span className="w-11 h-11 rounded-xl bg-white text-brand-600 flex items-center justify-center flex-shrink-0">
+                                        <i className={`fas ${row.icon}`}></i>
+                                    </span>
+                                    <div className="min-w-0">
+                                        <dt className="text-sm text-muted">{row.label}</dt>
+                                        <dd className="text-lg font-medium text-ink">{row.value}</dd>
+                                    </div>
+                                </div>
+                            ))}
+                        </dl>
+                    </div>
+                </section>
+
                 {/* Contact */}
                 <section className="block-card p-6 sm:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                     <div className="flex items-center gap-4">
@@ -115,7 +152,7 @@ export default function LandingPage({ settings }) {
                         </span>
                         <div>
                             <h2 className="text-xl font-semibold text-ink">ต้องการความช่วยเหลือ?</h2>
-                            <p className="text-base text-muted">ติดต่อเจ้าหน้าที่ฝ่ายฝึกประสบการณ์วิชาชีพ</p>
+                            <p className="text-base text-muted">ติดต่อเจ้าหน้าที่ฝึกประสบการณ์วิชาชีพ {ORG.program}</p>
                         </div>
                     </div>
                     {settings.CONTACT_EMAIL && (
@@ -127,9 +164,15 @@ export default function LandingPage({ settings }) {
             </main>
 
             <footer className="bg-brand-900 text-blue-100 mt-6">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-base">
-                    <p>&copy; {year} {settings.SYSTEM_NAME}</p>
-                    <p className="text-blue-300">มหาวิทยาลัยราชภัฏพิบูลสงคราม</p>
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-base">
+                    <div className="flex items-center gap-4">
+                        <img src="/main-logo.png" alt="" className="w-14 h-14 object-contain bg-white rounded-xl p-1 flex-shrink-0" />
+                        <div>
+                            <p className="text-white font-medium">{ORG.program}</p>
+                            <p className="text-blue-200">{ORG.faculty} {ORG.university}</p>
+                        </div>
+                    </div>
+                    <p className="text-blue-300">&copy; {year} {settings.SYSTEM_NAME}</p>
                 </div>
             </footer>
         </div>
